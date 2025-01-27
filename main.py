@@ -9,9 +9,6 @@ import logging
 import discord
 from discord.ext import commands
 
-# regular expression for loading cogs
-import re
-
 
 # logging for discord
 logger = logging.getLogger("discord")
@@ -68,11 +65,10 @@ async def on_member_join(member: discord.Member):
 
 
 # loading cogs (if there are multiple cog folders, the way to load them has to be altered accordingly)
-pattern = r"(.+)(\.py)"
 for filename in os.listdir(cog_folder):
-	match = re.fullmatch(pattern, filename)
-	if match:
-		bot.load_extension(f"{cog_folder}.{match[1]}")
+	filename, file_extension = os.path.splitext(filename)
+	if file_extension == ".py":
+		bot.load_extension(f"{cog_folder}.{filename}")
 
 # running the bot
 bot.run(discord_token)
