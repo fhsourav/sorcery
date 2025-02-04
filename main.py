@@ -7,7 +7,8 @@ import logging
 
 # pycord
 import discord
-from discord.ext import commands
+
+from src import SorceryBot
 
 
 # logging for discord
@@ -32,43 +33,26 @@ cog_folder = os.getenv("COG_FOLDER")
 # the bot uses cogs for all the commands
 
 description = """
-A basic utility bot (for now)
+An all-in-one bot.
 """
 
 # intents
 intents = discord.Intents.default()
-intents.members = True
-intents.message_content = True
 
 # the bot
-bot = discord.Bot(
+bot = SorceryBot(
 	description=description,
 	intents=intents,
-	help_command=commands.DefaultHelpCommand(),
 	debug_guilds=debug_guilds
 )
 
-
-@bot.event
-async def on_ready():
-	"""Prints an on_ready message to the console."""
-	print(f"Logged in as {bot.user} (ID: {bot.user.id})")
-	print("------")
-
-
-@bot.listen
-async def on_member_join(member: discord.Member):
-	"""Sends a welcome message mentioning the newly joined member in the desired channel."""
-	channel_id = -1 # change -1 to YOUR_DESIRED_CHANNEL_ID
-	channel = bot.get_channel(channel_id)
-	await channel.send(f"Welcome to the server {member.mention}!")
-
-
 # loading cogs (if there are multiple cog folders, the way to load them has to be altered accordingly)
-for filename in os.listdir(cog_folder):
-	filename, file_extension = os.path.splitext(filename)
-	if file_extension == ".py":
-		bot.load_extension(f"{cog_folder}.{filename}")
+for (root, dirs, files) in os.walk(cog_folder):
+	dotpath = root.replace(os.sep, ".")
+	for file in files:
+		name, ext = os.path.splitext(file)
+		if ext == ".py":
+			bot.load_extension(f"{dotpath}.{name}")
 
 # running the bot
 bot.run(discord_token)

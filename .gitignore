@@ -175,3 +175,11 @@ discord.log
 
 # notes to self
 notes-to-self.md
+
+# Lavalink
+lavalink/logs/
+lavalink/plugins/
+Lavalink.jar
+
+# Old files
+cogs_old/

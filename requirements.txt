@@ -1,0 +1,5 @@
+py-cord[voice,speed]
+python-dotenv
+aiohappyeyeballs
+async-timeout
+sqlalchemy
