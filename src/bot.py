@@ -1,7 +1,5 @@
 import discord
 
-import wavelink
-
 
 class SorceryBot(discord.Bot): # subclass discord.Bot
 

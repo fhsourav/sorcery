@@ -19,7 +19,10 @@ class ConnectLavalink(discord.Cog):
 			wavelink.Node(
 				identifier=None, # this identifier must be unique for all the nodes; pass None to generate a random one on creation
 				uri=os.getenv("LAVALINK_SERVER_ADDRESS"), # for the uri, protocol (http/s) is required, port must be what Lavalink uses. e.g. http://0.0.0.0:2333
-				password=os.getenv("LAVALINK_SERVER_PASSWORD") # password of the lavalink server. check environment variables or application.yml file
+				password=os.getenv("LAVALINK_SERVER_PASSWORD"), # password of the lavalink server. check environment variables or application.yml file
+				
+				# starts when a track ends (at least one track has to be played)
+				inactive_player_timeout=120, # 2 minutes (120 seconds); Setting the value to `None` disables the check
 			)
 		]
 

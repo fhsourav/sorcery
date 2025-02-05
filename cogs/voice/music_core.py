@@ -1,3 +1,4 @@
+import asyncio
 from typing import cast
 
 import discord
@@ -12,7 +13,85 @@ class MusicCore(discord.Cog):
 	def __init__(self, bot: discord.Bot):
 		self.bot = bot
 		self.tracks = {} # dict for temporarily storing music search results
-		self.autoplaymode = wavelink.AutoPlayMode.partial
+		self.autoplaymode = wavelink.AutoPlayMode.partial # default AutoPlayMode
+		self.voice_inactivity_timeout_task: asyncio.Task = None # if no user in the bot's voice channel
+		self.wavelink_is_inactive = False # if wavelink player is inactive. Initially False to for the check in on_voice_state_update. 
+											# this value is only being changed from within on_wavelink_track_start and on_wavelink_track_end
+		self.channel_status = "" # channel status that the bot set
+
+
+	async def voice_inactivity_timeout(self, player: wavelink.Player, msg: str):
+		"""Helper function: If no user in the voice channel that the bot is connected to, disconnect after a timeout"""
+		try:
+			await player.home.send(f"{msg} Leaving after a timeout of 2 minutes.")
+
+			await asyncio.sleep(120) # 2 minutes (120 seconds) of inactivity
+
+			await player.home.send("Bot has been disconnected.")
+
+			if self.channel_status == player.channel.status:
+				await player.channel.set_status(None)
+				self.channel_status = ""
+
+			await player.disconnect()
+
+		except asyncio.CancelledError:
+			pass # if cancelled, do nothing (maybe do something someday, but for now, nothing comes to mind.)
+
+
+	@discord.Cog.listener()
+	async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+		"""When a user changes their voice state."""
+
+		# This event is currently being used to check if there are any users
+		# in the voice channel that the bot is connected to.
+		# If there are no users in the voice channel, we start a 2 minute countdown
+		# and if no user joins within 2 minutes, the bot disconnects 
+
+		# If the member is a bot, do nothing
+		if member.bot:
+			return
+		
+		# return if wavelink is inactive and voice inactivity timeout is None
+		# Explanation: is wavelink is inactive, then wavelink's inactivity timeout is already running, so return
+		# and if wavelink is active, and voice_inactivity_timeout_task exists, return
+
+		player: wavelink.Player = cast(wavelink.Player, member.guild.voice_client)
+
+		if not player: # If player is not connected
+			# TODO: Error checking
+			return
+
+		if before.channel == player.channel: # member has left the channel
+
+			if self.wavelink_is_inactive:
+				return
+
+			if not False in [member.bot for member in player.channel.members]: # if the channel is inactive (if all members are bots)
+				msg = "" # the message to send
+				if player.playing and not player.paused: # if the player is in the middle of playing a track
+					await player.pause(True) # pause the player
+					msg += "Playback paused." # notify in a message
+				if len(player.channel.members) > 1: # if there are other bots in the channel
+					msg += f" {player.channel.name} has now become a playground of bots."
+				else: # if the bot is alone in the channel
+					msg += f" I am alone in {player.channel.name}."
+
+				self.voice_inactivity_timeout_task = asyncio.create_task(self.voice_inactivity_timeout(player, msg))
+		
+		if after.channel == player.channel: # member has joined the channel
+			if self.voice_inactivity_timeout_task:
+				if not self.voice_inactivity_timeout_task.done(): # if a member joins the channel before timeout is done
+					msg = ""
+					self.voice_inactivity_timeout_task.cancel() # cancel the task
+					self.voice_inactivity_timeout_task = None
+					if player.playing: # if player was playing a track
+						await player.pause(False) # resume it
+						msg += "Playback resumed."
+					
+					await player.home.send(f"Timeout cancelled. {msg}") # notify in a message
+				else:
+					self.voice_inactivity_timeout_task = None
 
 	
 	@discord.Cog.listener()
@@ -27,6 +106,8 @@ class MusicCore(discord.Cog):
 		original: wavelink.Playable | None = payload.original
 		track: wavelink.Playable = payload.track
 
+		self.wavelink_is_inactive = False
+
 		embed: discord.Embed = discord.Embed(title="Now Playing")
 		embed.description = f"**{track.title}** by `{track.author}`"
 
@@ -39,7 +120,8 @@ class MusicCore(discord.Cog):
 		if track.album.name:
 			embed.add_field(name="Album", value=track.album.name)
 
-		await player.channel.set_status(f"Playing {track.title}")
+		self.channel_status = f"Playing {track.title}"
+		await player.channel.set_status(self.channel_status)
 
 		await player.home.send(embed=embed)
 
@@ -53,7 +135,24 @@ class MusicCore(discord.Cog):
 			# TODO: Handle edge case
 			return
 
-		await player.channel.set_status(None)
+		if self.channel_status == player.channel.status:
+			await player.channel.set_status(None)
+			self.channel_status = ""
+
+		self.wavelink_is_inactive = True
+
+		if not player.current and player.queue.is_empty and self.autoplaymode == wavelink.AutoPlayMode.partial:
+			await player.home.send("Player is inactive. Leaving after 2 minutes of inactivity.")
+
+	
+	@discord.Cog.listener()
+	async def on_wavelink_inactive_player(self, player: wavelink.Player):
+		if self.voice_inactivity_timeout_task:
+			if not self.voice_inactivity_timeout_task.done():
+				self.voice_inactivity_timeout_task.cancel()
+			self.voice_inactivity_timeout_task = None
+		await player.disconnect()
+		await player.home.send("Bot has been disconnected.")
 
 
 	@discord.slash_command(name="join")
@@ -76,7 +175,18 @@ class MusicCore(discord.Cog):
 		if not player:
 			return await ctx.respond("The bot is not connected to a voice channel.")
 		
-		await player.channel.set_status(None)
+		if ctx.author not in player.channel.members and False in [member.bot for member in player.channel.members]:
+			return await ctx.respond("You are not in the voice channel and the channel is not empty.")
+
+		if self.voice_inactivity_timeout_task:
+			if not self.voice_inactivity_timeout_task.done():
+				self.voice_inactivity_timeout_task.cancel()
+			self.voice_inactivity_timeout_task = None
+
+		if self.channel_status == player.channel.status:
+			await player.channel.set_status(None) # since player.disconnect() does not trigger on_wavelink_track_end
+			self.channel_status = ""
+		
 		await player.disconnect()
 
 		await ctx.respond("Bot has been disconnected.")
@@ -153,7 +263,7 @@ class MusicCore(discord.Cog):
 		if not player:
 			return
 		
-		player.autoplay = self.autoplaymode
+		player.autoplay = self.autoplaymode # setting autoplay mode
 
 		tracks = self.tracks[query]
 		if isinstance(tracks, wavelink.Playlist):
@@ -169,6 +279,38 @@ class MusicCore(discord.Cog):
 		if not player.playing:
 			# Play now since we aren't playing anything...
 			await player.play(player.queue.get(), volume=30)
+
+	
+	@discord.slash_command(name="autoplay")
+	@discord.option(
+		name="mode",
+		description="If autoplay is enabled, player will play recommended tracks.",
+		choices=[
+			discord.OptionChoice(
+				name="Enable",
+				value="1"
+			),
+			discord.OptionChoice(
+				name="Disable",
+				value="0"
+			)
+		]
+	)
+	async def autoplay(self, ctx: discord.ApplicationContext, mode: int):
+		"""Choose Autoplay Mode."""
+		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
+
+		if not await check_voice(ctx=ctx, player=player):
+			return
+		
+		if mode == 0:
+			self.autoplaymode = wavelink.AutoPlayMode.partial
+		else:
+			self.autoplaymode = wavelink.AutoPlayMode.enabled
+
+		player.autoplay = self.autoplaymode
+
+		await ctx.respond(f"Autoplay has been {'disabled' if mode == 0 else 'enabled'}.")
 
 
 	@discord.slash_command(name="volume")
