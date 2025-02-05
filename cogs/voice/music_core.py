@@ -51,6 +51,10 @@ class MusicCore(discord.Cog):
 		# If the member is a bot, do nothing
 		if member.bot:
 			return
+
+		# return if both before and after have the same channel, meaning no user left or joined a voice channel
+		if after.channel == before.channel:
+			return
 		
 		# return if wavelink is inactive and voice inactivity timeout is None
 		# Explanation: is wavelink is inactive, then wavelink's inactivity timeout is already running, so return
@@ -79,7 +83,7 @@ class MusicCore(discord.Cog):
 
 				self.voice_inactivity_timeout_task = asyncio.create_task(self.voice_inactivity_timeout(player, msg))
 		
-		if after.channel == player.channel: # member has joined the channel
+		elif after.channel == player.channel: # member has joined the channel
 			if self.voice_inactivity_timeout_task:
 				if not self.voice_inactivity_timeout_task.done(): # if a member joins the channel before timeout is done
 					msg = ""
