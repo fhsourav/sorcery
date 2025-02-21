@@ -5,7 +5,7 @@ import discord
 
 import wavelink
 
-from utils.shared_functions import *
+from utils.music import CoreFunctions
 
 class MusicCore(discord.Cog):
 	"""This cog contains the core music features."""
@@ -13,21 +13,29 @@ class MusicCore(discord.Cog):
 	def __init__(self, bot: discord.Bot):
 		self.bot = bot
 		self.tracks = {} # dict for temporarily storing music search results
-		self.autoplaymode = wavelink.AutoPlayMode.partial # default AutoPlayMode
-		self.voice_inactivity_timeout_task: asyncio.Task = None # if no user in the bot's voice channel
-		self.wavelink_is_inactive = False # if wavelink player is inactive. Initially False to for the check in on_voice_state_update. 
-											# this value is only being changed from within on_wavelink_track_start and on_wavelink_track_end
+		self.voice_inactivity_timeout_task: asyncio.Task = None # if no user in the player's voice channel
+		self.wavelink_is_inactive = False # if wavelink player is inactive. Initially False for the check in `on_voice_state_update`. 
+											# this value is only being changed from within `on_wavelink_track_start` and `on_wavelink_track_end`.
 		self.channel_status = "" # channel status that the bot set
 
 
+	@discord.Cog.listener()
+	async def on_ready(self):
+		# I wanted to initialize this variable/const (whatever) in __init__
+		# but cogs are initialized before logging in
+		# so I was getting errors
+		# on_ready event listener works since it is accessed after the bot is logged in
+		self.DISCONNECT_MESSAGE = f"{self.bot.user.name} has gracefully left the stage. See you next time!"
+
+
 	async def voice_inactivity_timeout(self, player: wavelink.Player, msg: str):
-		"""Helper function: If no user in the voice channel that the bot is connected to, disconnect after a timeout"""
+		"""Helper function: If no user in the voice channel that the player is connected to, disconnect after a timeout"""
 		try:
 			await player.home.send(f"{msg} Leaving after a timeout of 2 minutes.")
 
 			await asyncio.sleep(120) # 2 minutes (120 seconds) of inactivity
 
-			await player.home.send("Bot has been disconnected.")
+			await player.home.send(self.DISCONNECT_MESSAGE)
 
 			if self.channel_status == player.channel.status:
 				await player.channel.set_status(None)
@@ -44,9 +52,9 @@ class MusicCore(discord.Cog):
 		"""When a user changes their voice state."""
 
 		# This event is currently being used to check if there are any users
-		# in the voice channel that the bot is connected to.
+		# in the voice channel that the player is connected to.
 		# If there are no users in the voice channel, we start a 2 minute countdown
-		# and if no user joins within 2 minutes, the bot disconnects 
+		# and if no user joins within 2 minutes, the player disconnects 
 
 		# If the member is a bot, do nothing
 		if member.bot:
@@ -77,9 +85,9 @@ class MusicCore(discord.Cog):
 					await player.pause(True) # pause the player
 					msg += "Playback paused." # notify in a message
 				if len(player.channel.members) > 1: # if there are other bots in the channel
-					msg += f" {player.channel.name} has now become a playground of bots."
+					msg += f" {player.channel.mention} has now become a playground of bots."
 				else: # if the bot is alone in the channel
-					msg += f" I am alone in {player.channel.name}."
+					msg += f" {self.bot.user.name} is alone in {player.channel.name}."
 
 				self.voice_inactivity_timeout_task = asyncio.create_task(self.voice_inactivity_timeout(player, msg))
 		
@@ -145,8 +153,8 @@ class MusicCore(discord.Cog):
 
 		self.wavelink_is_inactive = True
 
-		if not player.current and player.queue.is_empty and self.autoplaymode == wavelink.AutoPlayMode.partial:
-			await player.home.send("Player is inactive. Leaving after 2 minutes of inactivity.")
+		# if not player.current and player.queue.is_empty and self.autoplaymode == wavelink.AutoPlayMode.partial:
+		# 	await player.home.send("Player is inactive. Leaving after 2 minutes.")
 
 	
 	@discord.Cog.listener()
@@ -156,19 +164,7 @@ class MusicCore(discord.Cog):
 				self.voice_inactivity_timeout_task.cancel()
 			self.voice_inactivity_timeout_task = None
 		await player.disconnect()
-		await player.home.send("Bot has been disconnected.")
-
-
-	@discord.slash_command(name="join")
-	async def join(self, ctx: discord.ApplicationContext):
-		"""Join the voice channel user is in."""
-		
-		player: wavelink.Player = await join_voice(ctx=ctx)
-
-		if not player:
-			return
-		
-		await ctx.respond(f"Joined {ctx.author.voice.channel.name}")
+		await player.home.send(f"Inactivity detected. {self.DISCONNECT_MESSAGE}")
 
 
 	@discord.slash_command(name="disconnect")
@@ -176,11 +172,9 @@ class MusicCore(discord.Cog):
 		"""Disconnects the Player."""
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
 
-		if not player:
-			return await ctx.respond("The bot is not connected to a voice channel.")
-		
-		if ctx.author not in player.channel.members and False in [member.bot for member in player.channel.members]:
-			return await ctx.respond("You are not in the voice channel and the channel is not empty.")
+		# if the player cannot be disconnected for reasons such as the user not being in the channel
+		if not await CoreFunctions.check_voice(ctx=ctx, disconnect=True):
+			return
 
 		if self.voice_inactivity_timeout_task:
 			if not self.voice_inactivity_timeout_task.done():
@@ -193,7 +187,7 @@ class MusicCore(discord.Cog):
 		
 		await player.disconnect()
 
-		await ctx.respond("Bot has been disconnected.")
+		await ctx.respond(self.DISCONNECT_MESSAGE)
 
 
 	async def autocomplete_query(self, ctx: discord.AutocompleteContext):
@@ -218,7 +212,7 @@ class MusicCore(discord.Cog):
 		else:
 			# if not, create separate entry for all the tracks
 			for track in tracklist:
-				track_str = f"[{milli_to_minutes(track.length)}] {track.title[:50]} by {track.author[:20]} ({track.source})" # length of name must be between 0 to 100; slicing title and author to 50 and 20 characters respectively
+				track_str = f"[{CoreFunctions.milli_to_minutes(track.length)}] {track.title[:50]} by {track.author[:20]} ({track.source})" # length of name must be between 0 to 100; slicing title and author to 50 and 20 characters respectively
 				self.tracks[track_str] = track # store the track
 
 		return [
@@ -234,7 +228,7 @@ class MusicCore(discord.Cog):
 			discord.OptionChoice(name="YouTube Music", value="ytmsearch"),
 			discord.OptionChoice(name="YouTube", value="ytsearch"),
 			discord.OptionChoice(name="SoundCloud", value="scsearch"),
-			discord.OptionChoice(name="Any link (even local files!)", value="")
+			discord.OptionChoice(name="Any link", value=None)
 		]
 	)
 	@discord.option(
@@ -260,31 +254,12 @@ class MusicCore(discord.Cog):
 		
 		# if source is invalid
 		if query == "No playlist found." or query == "Could not find anything for that query." or query not in self.tracks:
-			await ctx.respond(f"Could not find any {'playlist' if playlist else 'tracks'} with that query. Please try again.")
+			await ctx.respond(f"Could not find any {'playlist' if playlist else 'track'} with that query. Please try again.")
 			return
-		
-		player: wavelink.Player = await join_voice(ctx=ctx)
-		if not player:
-			return
-		
-		player.autoplay = self.autoplaymode # setting autoplay mode
 
-		tracks = self.tracks[query]
-		if isinstance(tracks, wavelink.Playlist):
-			# tracks is a playlist...
-			added: int = await player.queue.put_wait(tracks)
-			await ctx.respond(f"Added the playlist **`{tracks.name}`** ({added} songs) to the queue.")
-		else:
-			# tracks is not a playlist, it's a single track
-			track = tracks
-			await player.queue.put_wait(track)
-			await ctx.respond(f"Added **`{track} ({track.source})`** to the queue.")
+		await CoreFunctions.play(ctx, self.tracks[query])
 
-		if not player.playing:
-			# Play now since we aren't playing anything...
-			await player.play(player.queue.get(), volume=30)
 
-	
 	@discord.slash_command(name="autoplay")
 	@discord.option(
 		name="mode",
@@ -302,19 +277,7 @@ class MusicCore(discord.Cog):
 	)
 	async def autoplay(self, ctx: discord.ApplicationContext, mode: int):
 		"""Choose Autoplay Mode."""
-		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
-
-		if not await check_voice(ctx=ctx, player=player):
-			return
-		
-		if mode == 0:
-			self.autoplaymode = wavelink.AutoPlayMode.partial
-		else:
-			self.autoplaymode = wavelink.AutoPlayMode.enabled
-
-		player.autoplay = self.autoplaymode
-
-		await ctx.respond(f"Autoplay has been {'disabled' if mode == 0 else 'enabled'}.")
+		await CoreFunctions.set_autoplay_mode(ctx, mode)
 
 
 	@discord.slash_command(name="volume")
@@ -325,13 +288,7 @@ class MusicCore(discord.Cog):
 	)
 	async def volume(self, ctx: discord.ApplicationContext, value: int):
 		"""Set the volume of the player [0 - 100]"""
-		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
-
-		if not await check_voice(ctx=ctx, player=player):
-			return
-		
-		await player.set_volume(value)
-		await ctx.respond(f"Volume set to {value}.")
+		await CoreFunctions.set_volume(ctx, value)
 
 	
 	@discord.slash_command(name="skip")
@@ -339,7 +296,7 @@ class MusicCore(discord.Cog):
 		"""Skip the current song."""
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
 
-		if not await check_voice(ctx=ctx, player=player):
+		if not await CoreFunctions.check_voice(ctx):
 			return
 		
 		if not player.playing:
@@ -351,12 +308,12 @@ class MusicCore(discord.Cog):
 		await ctx.respond(f"skipped {track.title} by {track.author}")		
 	
 
-	@discord.slash_command(name="toggle_playback")
-	async def toggle_playback(self, ctx: discord.ApplicationContext):
+	@discord.slash_command(name="playpause")
+	async def playpause(self, ctx: discord.ApplicationContext):
 		"""Pause/resume playback."""
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
 		
-		if not await check_voice(ctx=ctx, player=player):
+		if not await CoreFunctions.check_voice(ctx):
 			return
 		
 		if not player.playing:
@@ -372,13 +329,13 @@ class MusicCore(discord.Cog):
 		"""Stops the player, clears the queue."""
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
 
-		if not await check_voice(ctx=ctx, player=player):
+		if not await CoreFunctions.check_voice(ctx):
 			return
 		
 		player.queue.clear()
 
 		if player.playing:
-			await player.stop(force=True) # player.stop is an alias for player.skip 
+			await player.skip(force=True)
 
 		await ctx.respond("Playback has stopped.")
 

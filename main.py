@@ -8,7 +8,7 @@ import logging
 # pycord
 import discord
 
-from src import SorceryBot
+from utils.bot import SorceryBot
 
 
 # logging for discord

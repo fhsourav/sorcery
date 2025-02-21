@@ -3,6 +3,10 @@ import discord
 
 class SorceryBot(discord.Bot): # subclass discord.Bot
 
+
+	inactive_timeout = 120
+
+
 	async def on_ready(self):
 		"""Prints an on_ready message on the console."""
 		print(f"Logged in as {self.user} (ID: {self.user.id})")
