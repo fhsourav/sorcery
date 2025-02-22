@@ -132,6 +132,30 @@ class CoreFunctions():
 			# Play now since we aren't playing anything...
 			await player.play(player.queue.get(), volume=player.user_volume)
 
+	
+	async def stop(ctx: discord.ApplicationContext):
+		"""
+		Stops playback, clears the queue.
+
+		params:
+			ctx: (discord.ApplicationContext): the context of the issued command
+		"""
+		if not await CoreFunctions.check_voice(ctx):
+			return
+		
+		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
+
+		player.autoplay = wavelink.AutoPlayMode.partial # changing the autoplaymode to be able to stop playback (not sure what disable would do)
+
+		player.queue.clear()
+
+		if player.playing:
+			await player.skip(force=True)
+
+		player.autoplay = player.user_autoplaymode
+
+		await ctx.respond("Playback has stopped.")
+
 
 	async def set_autoplay_mode(ctx: discord.ApplicationContext, mode: int):
 		"""

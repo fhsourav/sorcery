@@ -96,14 +96,13 @@ class MusicCore(discord.Cog):
 				if not self.voice_inactivity_timeout_task.done(): # if a member joins the channel before timeout is done
 					msg = ""
 					self.voice_inactivity_timeout_task.cancel() # cancel the task
-					self.voice_inactivity_timeout_task = None
 					if player.playing: # if player was playing a track
 						await player.pause(False) # resume it
 						msg += "Playback resumed."
 					
 					await player.home.send(f"Timeout cancelled. {msg}") # notify in a message
-				else:
-					self.voice_inactivity_timeout_task = None
+				
+				self.voice_inactivity_timeout_task = None # remove the task
 
 	
 	@discord.Cog.listener()
@@ -254,7 +253,7 @@ class MusicCore(discord.Cog):
 		
 		# if source is invalid
 		if query == "No playlist found." or query == "Could not find anything for that query." or query not in self.tracks:
-			await ctx.respond(f"Could not find any {'playlist' if playlist else 'track'} with that query. Please try again.")
+			await ctx.respond(f"Could not find any {'playlist' if playlist else 'track'} with that query. Please try again.", ephemeral=True)
 			return
 
 		await CoreFunctions.play(ctx, self.tracks[query])
@@ -327,17 +326,7 @@ class MusicCore(discord.Cog):
 	@discord.slash_command(name="stop")
 	async def stop(self, ctx: discord.ApplicationContext):
 		"""Stops the player, clears the queue."""
-		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
-
-		if not await CoreFunctions.check_voice(ctx):
-			return
-		
-		player.queue.clear()
-
-		if player.playing:
-			await player.skip(force=True)
-
-		await ctx.respond("Playback has stopped.")
+		await CoreFunctions.stop(ctx)
 
 
 def setup(bot: discord.Bot):
