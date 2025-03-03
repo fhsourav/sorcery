@@ -43,6 +43,8 @@ class QueueFunctions():
 			description += "## 📜 Queue"
 		elif category == 1:
 			description += "## ⌛ History"
+			if queue:
+				queue = reversed(queue)
 		elif category == 2:
 			description += f"## 💾 Playlist" # gotta find a way to replace it with playlist name
 		else:
@@ -51,22 +53,23 @@ class QueueFunctions():
 		
 		author = discord.EmbedAuthor(name=f"{ctx.author.nick if ctx.author.nick else ctx.author.display_name}", icon_url=ctx.author.avatar)
 
-		embed_pages = [] # all the pages for the paginator as a list of Embed objects 
+		embed_pages = [] # all the pages for the paginator as a list of Embed objects
+
+		if not queue:
+			embed_pages.append(discord.Embed(
+				author=author,
+				fields=[discord.EmbedField(name="", value=f"\n{'Queue' if category == 0 else 'History' if category == 1 else 'Playlist'} is empty.", inline=False)],
+				description=description,
+				footer=footer,
+				thumbnail=thumbnail,
+			))
 
 		# temp_page = discord.Embed()
 		temp_page = [] # A page is basically a list of EmbedField objects
 
 		for idx, item in enumerate(queue):
 
-			if category == 1:
-				position = idx
-			else:
-				position = idx + 1
-			
-			if position == 0:
-				continue
-
-			trackEmbed = discord.EmbedField(name="", value=f"\n**#{position} [{item.title}]({item.uri})** by `{item.author}` [{CoreFunctions.milli_to_minutes(item.length)}]", inline=False)
+			trackEmbed = discord.EmbedField(name="", value=f"\n**#{idx + 1} [{item.title}]({item.uri})** by `{item.author}` [{CoreFunctions.milli_to_minutes(item.length)}]", inline=False)
 			temp_page.append(trackEmbed)
 
 			if idx != 0 and idx % 9 == 0:

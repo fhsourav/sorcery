@@ -13,7 +13,7 @@ from utils.bot import SorceryBot
 
 # logging for discord
 logger = logging.getLogger("discord")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 handler = logging.FileHandler(filename="discord.log", encoding="utf-8", mode="a")
 handler.setFormatter(logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s"))
 logger.addHandler(handler)
@@ -21,14 +21,8 @@ logger.addHandler(handler)
 # loading .env
 load_dotenv()
 
-# loading guild(server) ids from .env
-debug_guilds = os.getenv("GUILD_IDS").split(",")
-
 # loading discord_token
 discord_token = os.getenv("DISCORD_TOKEN")
-
-# loading cog_folder (if there are multiple cog folders, the way to load them has to be altered accordingly)
-cog_folder = os.getenv("COG_FOLDER")
 
 # the bot uses cogs for all the commands
 
@@ -43,11 +37,10 @@ intents = discord.Intents.default()
 bot = SorceryBot(
 	description=description,
 	intents=intents,
-	debug_guilds=debug_guilds
 )
 
 # loading cogs (if there are multiple cog folders, the way to load them has to be altered accordingly)
-for (root, dirs, files) in os.walk(cog_folder):
+for (root, dirs, files) in os.walk("cogs"):
 	dotpath = root.replace(os.sep, ".")
 	for file in files:
 		name, ext = os.path.splitext(file)

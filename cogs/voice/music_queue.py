@@ -15,15 +15,13 @@ class MusicQueue(discord.Cog):
 	
 	@discord.slash_command(name="queue")
 	async def queue(self, ctx: discord.ApplicationContext):
+		"""Display the current queue."""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
 
 		queue: wavelink.Queue = player.queue
-
-		if not queue:
-			return await ctx.respond("Queue is empty!")
 
 		paginator = QueueFunctions.get_queue_paginator(ctx, queue, 0)
 
@@ -32,17 +30,13 @@ class MusicQueue(discord.Cog):
 	
 	@discord.slash_command(name="history")
 	async def history(self, ctx: discord.ApplicationContext):
+		"""Display the queue history."""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
 
 		history: wavelink.Queue = player.queue.history
-
-		if not history:
-			return await ctx.respond("Queue history is empty!")
-		
-		history = reversed(history)
 
 		paginator = QueueFunctions.get_queue_paginator(ctx, history, 1)
 
@@ -52,15 +46,15 @@ class MusicQueue(discord.Cog):
 	@discord.slash_command(name="loop")
 	@discord.option(
 		name="mode",
-		description="Choose the loop mode.",
+		description="Choose a mode.",
 		choices=[
-			discord.OptionChoice(name="Off", value=0),
+			discord.OptionChoice(name="off", value=0),
 			discord.OptionChoice(name="current track", value=1),
 			discord.OptionChoice(name="all", value=2),
 		]
 	)
 	async def loop(self, ctx: discord.ApplicationContext, mode: int):
-		
+		"""Select the loop mode."""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
