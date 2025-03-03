@@ -183,3 +183,6 @@ Lavalink.jar
 
 # Old files
 cogs_old/
+
+# Test directory
+test/

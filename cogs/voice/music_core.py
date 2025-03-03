@@ -16,7 +16,6 @@ class MusicCore(discord.Cog):
 		self.voice_inactivity_timeout_task: asyncio.Task = None # if no user in the player's voice channel
 		self.wavelink_is_inactive = False # if wavelink player is inactive. Initially False for the check in `on_voice_state_update`. 
 											# this value is only being changed from within `on_wavelink_track_start` and `on_wavelink_track_end`.
-		self.channel_status = "" # channel status that the bot set
 
 
 	@discord.Cog.listener()
@@ -36,10 +35,8 @@ class MusicCore(discord.Cog):
 			await asyncio.sleep(120) # 2 minutes (120 seconds) of inactivity
 
 			await player.home.send(self.DISCONNECT_MESSAGE)
-
-			if self.channel_status == player.channel.status:
-				await player.channel.set_status(None)
-				self.channel_status = ""
+			
+			await player.channel.set_status(None)
 
 			await player.disconnect()
 
@@ -131,8 +128,7 @@ class MusicCore(discord.Cog):
 		if track.album.name:
 			embed.add_field(name="Album", value=track.album.name)
 
-		self.channel_status = f"Playing {track.title}"
-		await player.channel.set_status(self.channel_status)
+		await player.channel.set_status(f"Listening to {track.title}")
 
 		await player.home.send(embed=embed)
 
@@ -146,9 +142,7 @@ class MusicCore(discord.Cog):
 			# TODO: Handle edge case
 			return
 
-		if self.channel_status == player.channel.status:
-			await player.channel.set_status(None)
-			self.channel_status = ""
+		await player.channel.set_status(None)
 
 		self.wavelink_is_inactive = True
 
@@ -180,10 +174,8 @@ class MusicCore(discord.Cog):
 				self.voice_inactivity_timeout_task.cancel()
 			self.voice_inactivity_timeout_task = None
 
-		if self.channel_status == player.channel.status:
-			await player.channel.set_status(None) # since player.disconnect() does not trigger on_wavelink_track_end
-			self.channel_status = ""
-		
+		await player.channel.set_status(None) # since player.disconnect() does not trigger on_wavelink_track_end
+
 		await player.disconnect()
 
 		await ctx.respond(self.DISCONNECT_MESSAGE)
@@ -282,11 +274,11 @@ class MusicCore(discord.Cog):
 	@discord.slash_command(name="volume")
 	@discord.option(
 		name="value",
-		max_value=100,
+		max_value=200,
 		min_value=0,
 	)
 	async def volume(self, ctx: discord.ApplicationContext, value: int):
-		"""Set the volume of the player [0 - 100]"""
+		"""Set the volume of the player [0 - 200]"""
 		await CoreFunctions.set_volume(ctx, value)
 
 	
@@ -303,12 +295,18 @@ class MusicCore(discord.Cog):
 		
 		track: wavelink.Playable = player.current
 
+		loopmode = player.queue.mode
+		player.queue.mode = wavelink.QueueMode.normal
+
 		await player.skip(force=True)
+
+		player.queue.mode = loopmode
+
 		await ctx.respond(f"skipped {track.title} by {track.author}")		
 	
 
-	@discord.slash_command(name="playpause")
-	async def playpause(self, ctx: discord.ApplicationContext):
+	@discord.slash_command(name="pausetoggle")
+	async def pausetoggle(self, ctx: discord.ApplicationContext):
 		"""Pause/resume playback."""
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
 		

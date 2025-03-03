@@ -33,6 +33,24 @@ class CoreFunctions():
 		seconds = (milli // 1000) % 60
 		minutes = milli // (1000 * 60)
 		return f"{minutes:02}:{seconds:02}"
+
+
+	def ensure_length(self, txt: str, length: int, left: bool = True):
+		"""
+		Ensures length of a string by truncating it or padding it with spaces.
+
+		params:
+			txt (str): the string input
+			length (int): the desired length of the string
+			left (bool): True if the text should be left aligned (default); False if right
+		returns:
+			(str): the adjusted text
+		"""
+		if len(txt) > length:
+			txt = txt[: length - 3] + "..."
+		
+		if left:
+			return txt.ljust()
 	
 
 	async def check_voice(ctx: discord.ApplicationContext, disconnect: bool = False) -> bool:
@@ -109,20 +127,24 @@ class CoreFunctions():
 			# the author is not connected to player's voice channel
 			return await ctx.respond(f"Join {player.channel} to use this command.", ephemeral=True)
 
-		# `player.user_*` attributes are default attributes set by me
-		# `player.home` is also such an attribute
-		if not hasattr(player, "user_autoplaymode"):
-			player.user_autoplaymode = CoreFunctions.DEFAULT_AUTOPLAYMODE
+		# # `player.user_*` attributes are default attributes set by me
+		# # `player.home` is also such an attribute
+		# if not hasattr(player, "user_autoplaymode"):
+		# 	player.user_autoplaymode = CoreFunctions.DEFAULT_AUTOPLAYMODE
 
-		if not hasattr(player, "user_volume"):
-			player.user_volume = CoreFunctions.DEFAULT_VOLUME
+		# if not hasattr(player, "user_volume"):
+		# 	player.user_volume = CoreFunctions.DEFAULT_VOLUME
 
-		player.autoplay = player.user_autoplaymode # setting autoplay mode. if not set, it is disabled
+		# player.autoplay = player.user_autoplaymode # setting autoplay mode. if not set, it is disabled
+		# disabled will not be a function of my bot, so this will tell me if the player is joining for the first time
+		if player.autoplay == wavelink.AutoPlayMode.disabled:
+			player.autoplay = wavelink.AutoPlayMode.partial
+			await player.set_volume(30)
 
 		if isinstance(playable_item, wavelink.Playlist):
 			# playable_item is a playlist...
 			added: int = await player.queue.put_wait(playable_item)
-			await ctx.respond(f"Added the playlist **`{playable_item.name}`** ({added} songs) to the queue.")
+			await ctx.respond(f"Added the playlist **`{playable_item.name}`** ({added} tracks) to the queue.")
 		else:
 			# tracks is not a playlist, it's a single track
 			await player.queue.put_wait(playable_item)
@@ -130,7 +152,8 @@ class CoreFunctions():
 
 		if not player.playing:
 			# Play now since we aren't playing anything...
-			await player.play(player.queue.get(), volume=player.user_volume)
+			# await player.play(player.queue.get(), volume=player.user_volume)
+			await player.play(player.queue.get())
 
 	
 	async def stop(ctx: discord.ApplicationContext):
@@ -138,12 +161,16 @@ class CoreFunctions():
 		Stops playback, clears the queue.
 
 		params:
-			ctx: (discord.ApplicationContext): the context of the issued command
+			ctx (discord.ApplicationContext): the context of the issued command
+		returns:
+			(bool): True if stopped successfully, False otherwise
 		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
+
+		prev_autoplay_value = player.autoplay
 
 		player.autoplay = wavelink.AutoPlayMode.partial # changing the autoplaymode to be able to stop playback (not sure what disable would do)
 
@@ -152,7 +179,7 @@ class CoreFunctions():
 		if player.playing:
 			await player.skip(force=True)
 
-		player.autoplay = player.user_autoplaymode
+		player.autoplay = prev_autoplay_value
 
 		await ctx.respond("Playback has stopped.")
 
@@ -172,11 +199,9 @@ class CoreFunctions():
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
 		
 		if mode == 0:
-			player.user_autoplaymode = wavelink.AutoPlayMode.partial # player.user_autoplaymode is initialized in `play`
+			player.autoplay = wavelink.AutoPlayMode.partial
 		else:
-			player.user_autoplaymode = wavelink.AutoPlayMode.enabled
-
-		player.autoplay = player.user_autoplaymode
+			player.autoplay = wavelink.AutoPlayMode.enabled
 
 		await ctx.respond(f"Autoplay has been {'disabled' if mode == 0 else 'enabled'}.")
 
@@ -195,6 +220,6 @@ class CoreFunctions():
 		
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
 		
-		player.user_volume = value # player.user_volume is initialized in `play`
-		await player.set_volume(player.user_volume)
+		# player.user_volume = value # player.user_volume is initialized in `play`
+		await player.set_volume(value)
 		await ctx.respond(f"Volume set to {value}.")
