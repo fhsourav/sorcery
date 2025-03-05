@@ -22,8 +22,6 @@ class MusicCore(discord.Cog):
 		# on_ready event listener works since it is accessed after the bot is logged in
 		self.DISCONNECT_MESSAGE = f"{self.bot.user.name} has gracefully left the stage. See you next time!"
 		self.search_results = {} # list of dict for temporarily storing music search results
-		for guild in self.bot.guilds:
-			self.search_results[guild.id] = {}
 
 
 	async def empty_channel_timeout(self, player: wavelink.Player, msg: str):
@@ -31,6 +29,7 @@ class MusicCore(discord.Cog):
 		try:
 			await player.home.send(f"{msg} Leaving after a timeout of 2 minutes.")
 			await asyncio.sleep(120) # 2 minutes (120 seconds) of inactivity
+			self.search_results.clear()
 			await player.home.send(self.DISCONNECT_MESSAGE)
 			await player.channel.set_status(None)
 			await player.disconnect()
@@ -114,6 +113,7 @@ class MusicCore(discord.Cog):
 	
 	async def disconnect_player(self, player: wavelink.Player):
 		self.clear_empty_channel_timeout_task(player)
+		self.search_results.clear()
 		if player.channel.status == player.channel_status:
 			await player.channel.set_status(None)
 		await player.home.send(self.DISCONNECT_MESSAGE)
@@ -173,6 +173,7 @@ class MusicCore(discord.Cog):
 	@discord.Cog.listener()
 	async def on_wavelink_inactive_player(self, player: wavelink.Player):
 		self.clear_empty_channel_timeout_task(player)
+		self.search_results.clear()
 		await player.home.send(f"Inactivity detected. {self.DISCONNECT_MESSAGE}")
 		await player.disconnect()
 
@@ -187,6 +188,8 @@ class MusicCore(discord.Cog):
 			return
 
 		self.clear_empty_channel_timeout_task(player)
+		self.search_results.clear()
+
 		if player.channel.status == player.channel_status:
 			await player.channel.set_status(None) # since player.disconnect() does not trigger on_wavelink_track_end
 
@@ -205,21 +208,25 @@ class MusicCore(discord.Cog):
 		# if tracklist is empty, return the value of the query
 		if not tracklist:
 			return [f"{ctx.value}" if ctx.value else "Could not find anything for that query."]
-		self.search_results[ctx.interaction.guild_id].clear() # clear previous query info (if any) from the self.tracks dictionary
+		
+		if not ctx.interaction.user.id in self.search_results:
+			self.search_results[ctx.interaction.user.id] = {}
+		else:
+			self.search_results[ctx.interaction.user.id].clear() # clear previous query info (if any) from the self.tracks dictionary
 
 		if playlist: # if the query is a playlist
 			if isinstance(tracklist, wavelink.Playlist): # check if the result is also a playlist
-				self.search_results[ctx.interaction.guild_id][tracklist.name] = tracklist # put the playlist in self.tracks
+				self.search_results[ctx.interaction.user.id][tracklist.name] = tracklist # put the playlist in self.tracks
 			else:
-				self.search_results[ctx.interaction.guild_id]["No playlist found."] = None
+				self.search_results[ctx.interaction.user.id]["No playlist found."] = None
 		else:
 			# if not, create separate entry for all the tracks
 			for track in tracklist:
 				track_str = f"[{CoreFunctions.milli_to_minutes(track.length)}] {track.title[:50]} by {track.author[:20]} ({track.source})" # length of name must be between 0 to 100; slicing title and author to 50 and 20 characters respectively
-				self.search_results[ctx.interaction.guild_id][track_str] = track # store the track
+				self.search_results[ctx.interaction.user.id][track_str] = track # store the track
 
 		return [
-			track_str for track_str in self.search_results[ctx.interaction.guild_id]
+			track_str for track_str in self.search_results[ctx.interaction.user.id]
 		]
 
 
@@ -256,11 +263,11 @@ class MusicCore(discord.Cog):
 			return
 		
 		# if source is invalid
-		if query == "No playlist found." or query == "Could not find anything for that query." or query not in self.search_results[ctx.guild_id]:
+		if query == "No playlist found." or query == "Could not find anything for that query." or query not in self.search_results[ctx.author.id]:
 			await ctx.respond(f"Could not find any {'playlist' if playlist else 'track'} with that query. Please try again.", ephemeral=True)
 			return
 
-		await CoreFunctions.play(ctx, self.search_results[ctx.guild_id][query])
+		await CoreFunctions.play(ctx, self.search_results[ctx.author.id][query])
 
 
 	@discord.slash_command(name="autoplay")
@@ -339,13 +346,6 @@ class MusicCore(discord.Cog):
 	async def stop(self, ctx: discord.ApplicationContext):
 		"""Stops the player, clears the queue."""
 		await CoreFunctions.stop(ctx)
-
-	
-	# @discord.slash_command(name="timeoutcheck")
-	# async def timeoutcheck(self, ctx: discord.ApplicationContext):
-	# 	"""Checks the inactivity timeout value."""
-	# 	player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
-	# 	await ctx.respond(player.inactive_timeout)
 
 
 def setup(bot: discord.Bot):
