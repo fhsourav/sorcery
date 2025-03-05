@@ -37,7 +37,8 @@ class QueueFunctions():
 			if player.playing:
 				description += f"### {'⏸️' if player.paused else '▶️'} Now playing\n"
 				description += f"**[{player.current.title}]({player.current.uri})** by `{player.current.author}` [{CoreFunctions.milli_to_minutes(player.current.length - player.position)} *left*]\n"
-				thumbnail = player.current.artwork
+				if player.current.artwork:
+					thumbnail = player.current.artwork
 
 		if category == 0:
 			description += "## 📜 Queue"

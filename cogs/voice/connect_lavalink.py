@@ -37,11 +37,24 @@ class ConnectLavalink(discord.Cog):
 
 	
 	@discord.Cog.listener()
+	async def on_shutdown(self):
+		"""Closing the bot"""
+		print("Closing connected Lavalink Nodes.")
+		await wavelink.Pool.close()
+
+	
+	@discord.Cog.listener()
 	async def on_wavelink_node_ready(self, payload: wavelink.NodeReadyEventPayload):
 		"""Everytime a node is successfully connected."""
 
-		print(f"Node with ID {payload.session_id} has connected")
+		print(f"Node with ID {payload.node.identifier} has connected")
 		print(f"Resumed session: {payload.resumed}")
+
+	
+	@discord.Cog.listener()
+	async def on_wavelink_node_closed(self, node: wavelink.Node, disconnected: list[wavelink.Player]):
+		"""Everytime a node is closed."""
+		print(f"Node with ID {node.identifier} has closed.")
 
 
 def setup(bot: discord.Bot):

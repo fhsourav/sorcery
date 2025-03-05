@@ -15,8 +15,8 @@ class CoreFunctions():
 	Core music functions.
 	"""
 
-	DEFAULT_AUTOPLAYMODE = wavelink.AutoPlayMode.partial
-	DEFAULT_VOLUME = 30
+	# DEFAULT_AUTOPLAYMODE = wavelink.AutoPlayMode.partial
+	# DEFAULT_VOLUME = 30
 
 
 	def milli_to_minutes(milli: int) -> str:
@@ -34,24 +34,6 @@ class CoreFunctions():
 		minutes = milli // (1000 * 60)
 		return f"{minutes:02}:{seconds:02}"
 
-
-	def ensure_length(self, txt: str, length: int, left: bool = True):
-		"""
-		Ensures length of a string by truncating it or padding it with spaces.
-
-		params:
-			txt (str): the string input
-			length (int): the desired length of the string
-			left (bool): True if the text should be left aligned (default); False if right
-		returns:
-			(str): the adjusted text
-		"""
-		if len(txt) > length:
-			txt = txt[: length - 3] + "..."
-		
-		if left:
-			return txt.ljust()
-	
 
 	async def check_voice(ctx: discord.ApplicationContext, disconnect: bool = False) -> bool:
 		"""
