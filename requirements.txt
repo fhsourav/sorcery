@@ -3,3 +3,4 @@ python-dotenv
 aiohappyeyeballs
 async-timeout
 sqlalchemy
+requests

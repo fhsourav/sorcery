@@ -36,9 +36,7 @@ class MusicQueue(discord.Cog):
 		
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
 
-		history: wavelink.Queue = player.queue.history
-
-		paginator = QueueFunctions.get_queue_paginator(ctx, history, 1)
+		paginator = QueueFunctions.get_queue_paginator(ctx, player.queue.history, 1)
 
 		await paginator.respond(ctx.interaction)
 
@@ -69,6 +67,55 @@ class MusicQueue(discord.Cog):
 		if mode == 2:
 			player.queue.mode = wavelink.QueueMode.loop_all
 			return await ctx.respond("Player loop is set to `all`.")
+	
+
+	autoplay = discord.SlashCommandGroup(name="autoplay")
+
+	@autoplay.command(name="mode")
+	@discord.option(
+		name="mode",
+		description="If autoplay is enabled, player will play recommended tracks.",
+		choices=[
+			discord.OptionChoice(
+				name="Enable",
+				value="1"
+			),
+			discord.OptionChoice(
+				name="Disable",
+				value="0"
+			)
+		]
+	)
+	async def set_autoplay(self, ctx: discord.ApplicationContext, mode: int):
+		"""Choose Autoplay Mode."""
+		await CoreFunctions.set_autoplay_mode(ctx, mode)
+
+
+	@autoplay.command(name="queue")
+	async def autoqueue(self, ctx: discord.ApplicationContext):
+		"""Display the autoplay queue."""
+		if not await CoreFunctions.check_voice(ctx):
+			return
+		
+		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
+
+		paginator = QueueFunctions.get_queue_paginator(ctx, player.auto_queue, 2)
+
+		await paginator.respond(ctx.interaction)
+	
+
+	@autoplay.command(name="history")
+	async def autohistory(self, ctx: discord.ApplicationContext):
+		"""Display the autoplay queue history."""
+		if not await CoreFunctions.check_voice(ctx):
+			return
+		
+		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
+
+		paginator = QueueFunctions.get_queue_paginator(ctx, player.auto_queue.history, 3)
+
+		await paginator.respond(ctx.interaction)
+
 
 
 def setup(bot: discord.Bot):

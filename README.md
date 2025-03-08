@@ -8,10 +8,30 @@ Trying to build a full-fledged discord bot that can do almost everything.
 - [x] **play** *search for a song or playlist and play*
 - [x] **disconnect** *disconnect from the voice channel if the bot is inactive*
 - [x] **autoplay** *choose autoplay mode*
-- [x] **playpause** *pause/resume*
+- [x] **pausetoggle** *pause/resume*
 - [x] **skip** *skip current track*
 - [x] **stop** *stop the track and clear the queue*
 - [x] **volume** *set the volume*
+- [x] **lyrics** *display lyrics of the current track*
+- [x] **nowplaying** *display information of the current track*
+
+### Queue
+
+- [x] **queue** *display the current queue*
+- [x] **history** *display the queue history*
+- [x] **autoplay queue** *display the autoplay queue*
+- [x] **autoplay history** *display the autoplay history*
+- [x] **autoplay mode** *set autoplay mode*
+- [x] **loop** *set loop mode*
+- [ ] **remove** *remove from queue*
+- [ ] **skipto** *skip to another track in the queue*
+- [ ] **shuffle** *shuffle the queue*
+
+### Playback Position Controls
+
+- [ ] **seek**
+- [ ] **fastforward**
+- [ ] **rewind**
 
 ### Sample Project Structure
 ```

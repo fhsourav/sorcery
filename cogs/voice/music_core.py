@@ -1,4 +1,5 @@
 import asyncio
+import time
 from typing import cast
 
 import discord
@@ -133,16 +134,25 @@ class MusicCore(discord.Cog):
 		track: wavelink.Playable = payload.track
 
 		embed: discord.Embed = discord.Embed(title="Now Playing")
-		embed.description = f"**{track.title}** by `{track.author}`"
+		embed.description = f"**[{track.title}]({track.uri})** by `{track.author}`"
 
 		if track.artwork:
 			embed.set_image(url=track.artwork)
 
-		if original and original.recommended:
-			embed.description += f"\n\n`This track was recommended via {track.source}`"
+		if original:
+			if original.recommended:
+				embed.description += f"\n\n`This track was recommended via {track.source}`"
+				CoreFunctions.add_track_extras(original, -1, autoplay=True)
 
-		if track.album.name:
-			embed.add_field(name="Album", value=track.album.name)
+			extra_info = dict(original.extras)
+			extra_info.update({"played_at": int(time.time())})
+			original.extras = extra_info
+
+			if original.album.name:
+				embed.add_field(name="Album", value=original.album.name)
+
+		footerText = CoreFunctions.get_player_state(player)
+		embed.set_footer(text=footerText)
 
 		player.channel_status = f"Listening to {track.title}"
 		await player.channel.set_status(player.channel_status)
@@ -268,26 +278,19 @@ class MusicCore(discord.Cog):
 			return
 
 		await CoreFunctions.play(ctx, self.search_results[ctx.author.id][query])
+	
 
+	@discord.slash_command(name="nowplaying")
+	async def nowplaying(self, ctx: discord.ApplicationContext):
+		"""Display information of the currently playing track."""
+		if not await CoreFunctions.check_voice(ctx):
+			return
+		
+		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
+		
+		embed = CoreFunctions.get_track_info_embed(ctx, player.current)
 
-	@discord.slash_command(name="autoplay")
-	@discord.option(
-		name="mode",
-		description="If autoplay is enabled, player will play recommended tracks.",
-		choices=[
-			discord.OptionChoice(
-				name="Enable",
-				value="1"
-			),
-			discord.OptionChoice(
-				name="Disable",
-				value="0"
-			)
-		]
-	)
-	async def autoplay(self, ctx: discord.ApplicationContext, mode: int):
-		"""Choose Autoplay Mode."""
-		await CoreFunctions.set_autoplay_mode(ctx, mode)
+		await ctx.respond(embed=embed)
 
 
 	@discord.slash_command(name="volume")
@@ -346,6 +349,26 @@ class MusicCore(discord.Cog):
 	async def stop(self, ctx: discord.ApplicationContext):
 		"""Stops the player, clears the queue."""
 		await CoreFunctions.stop(ctx)
+	
+
+	@discord.slash_command(name="lyrics")
+	async def lyrics(self, ctx: discord.ApplicationContext):
+		"""Display lyrics of the currently playing track."""
+		if not await CoreFunctions.check_voice(ctx):
+			return
+		
+		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
+		if player.current and "lyrics" in dict(player.current.extras):
+			author = discord.EmbedAuthor(name=f"{ctx.author.nick if ctx.author.nick else ctx.author.display_name}", icon_url=ctx.author.avatar)
+			description = f"Artist: {player.current.extras.artist_name}"
+			description += f"\nDuration: {CoreFunctions.milli_to_minutes(player.current.length)}"
+			description += f"\nAlbum: {player.current.album.name}"
+			description += "\n# 📝🎶 Lyrics"
+			description += f"\n\n {player.current.extras.lyrics}"
+			embed = discord.Embed(author=author, description=description, title=player.current.title, url=player.current.uri, thumbnail=player.current.artwork)
+			return await ctx.respond(embed=embed)
+		
+		return await ctx.respond("No lyrics found for the current track.")
 
 
 def setup(bot: discord.Bot):
