@@ -1,5 +1,5 @@
 import asyncio
-import time
+import requests
 from typing import cast
 
 import discord
@@ -137,19 +137,29 @@ class MusicCore(discord.Cog):
 		embed.description = f"**[{track.title}]({track.uri})** by `{track.author}`"
 
 		if track.artwork:
-			embed.set_image(url=track.artwork)
+			embed.set_thumbnail(url=track.artwork)
 
 		if original:
 			if original.recommended:
-				embed.description += f"\n\n`This track was recommended via {track.source}`"
-				CoreFunctions.add_track_extras(original, -1, autoplay=True)
-
+				embed.description += f"\n*This track was recommended via {track.source}*"
+			
 			extra_info = dict(original.extras)
-			extra_info.update({"played_at": int(time.time())})
+
+			if "requester_id" in extra_info:
+				embed.description += f"\n*This track was requested by <@{original.extras.requester_id}>*"
+
+			lrclib_data = requests.get(f"https://lrclib.net/api/get?artist_name={track.author}&track_name={track.title}")
+			if lrclib_data.status_code == 200:
+				lrclib_data = lrclib_data.json() # contains id, trackName, artistName, albumName, duration, instrumental, plainLyrics and syncedLyrics.
+				extra_info["albumName"] = lrclib_data["albumName"]
+				extra_info["trackName"] = lrclib_data["trackName"]
+				extra_info["artistName"] = lrclib_data["artistName"]
+				extra_info["plainLyrics"] = lrclib_data["plainLyrics"] if not lrclib_data["instrumental"] else "🎼 instrumental 🎼"
+
 			original.extras = extra_info
 
-			if original.album.name:
-				embed.add_field(name="Album", value=original.album.name)
+			if (not original.album.name) and "albumName" in dict(original.extras) and original.extras.albumName:
+				original.album.name = original.extras.albumName
 
 		footerText = CoreFunctions.get_player_state(player)
 		embed.set_footer(text=footerText)
@@ -358,17 +368,23 @@ class MusicCore(discord.Cog):
 			return
 		
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
-		if player.current and "lyrics" in dict(player.current.extras):
+		if player.playing and "plainLyrics" in dict(player.current.extras):
 			author = discord.EmbedAuthor(name=f"{ctx.author.nick if ctx.author.nick else ctx.author.display_name}", icon_url=ctx.author.avatar)
-			description = f"Artist: {player.current.extras.artist_name}"
+			description = f"Artist: {player.current.extras.artistName}"
 			description += f"\nDuration: {CoreFunctions.milli_to_minutes(player.current.length)}"
 			description += f"\nAlbum: {player.current.album.name}"
 			description += "\n# 📝🎶 Lyrics"
-			description += f"\n\n {player.current.extras.lyrics}"
-			embed = discord.Embed(author=author, description=description, title=player.current.title, url=player.current.uri, thumbnail=player.current.artwork)
+			description += f"\n\n {player.current.extras.plainLyrics}"
+			embed = discord.Embed(
+				author=author,
+				description=description,
+				title=player.current.extras.trackName,
+				url=player.current.uri,
+				thumbnail=player.current.artwork,
+			)
 			return await ctx.respond(embed=embed)
 		
-		return await ctx.respond("No lyrics found for the current track.")
+		return await ctx.respond("No lyrics found for the current track.", ephemeral=True)
 
 
 def setup(bot: discord.Bot):

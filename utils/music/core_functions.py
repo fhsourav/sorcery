@@ -1,7 +1,6 @@
 """
 Common functionalities that are shared by two or more cog functions.
 """
-import requests
 import time
 from typing import cast
 
@@ -217,20 +216,8 @@ class CoreFunctions():
 		return player_state
 
 
-	def add_track_extras(track: wavelink.Playable, author_id: int, autoplay: bool = False):
-		selected_info = {}
-		if not autoplay:
-			selected_info["requester_id"] = author_id
-			selected_info["added_at"] = int(time.time())
-
-		more_info = requests.get(f"https://lrclib.net/api/get?artist_name={track.author}&track_name={track.title}")
-		if more_info.status_code == 200:
-			more_info = more_info.json()
-			track.album.name = more_info["albumName"]
-			selected_info["artist_name"] = more_info["artistName"]
-			selected_info["lyrics"] = more_info["plainLyrics"] if not more_info["instrumental"] else "[instrumental]"
-
-		track.extras = selected_info
+	def add_track_extras(track: wavelink.Playable, author_id: int):
+		track.extras = {"requester_id": author_id, "added_at": int(time.time())}
 
 
 	def get_track_info_embed(ctx: discord.ApplicationContext, track: wavelink.Playable):
@@ -245,14 +232,13 @@ class CoreFunctions():
 
 		embed.set_author(name=f"{ctx.author.nick if ctx.author.nick else ctx.author.display_name}", icon_url=ctx.author.avatar)
 
-		embed.add_field(name="Artist", value=f"{track.extras.artist_name if 'artist_name' in dict(track.extras) else track.author}", inline=True)
+		embed.add_field(name="Artist", value=f"{track.extras.artistName if 'artistName' in dict(track.extras) else track.author}", inline=True)
 		embed.add_field(name="Duration", value=CoreFunctions.milli_to_minutes(track.length), inline=True)
 
 		if player:
 			embed.set_footer(text=CoreFunctions.get_player_state(player))
 			if player.playing and player.current == track:
 				embed.add_field(name="Position", value=CoreFunctions.milli_to_minutes(player.position), inline=True)
-				embed.add_field(name="Played", value=f"<t:{track.extras.played_at}:R>", inline=True)
 
 		if not track.recommended:
 			embed.add_field(name="Added", value=f"<t:{track.extras.added_at}:f>", inline=True)

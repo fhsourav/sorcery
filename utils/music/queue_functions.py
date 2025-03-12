@@ -5,6 +5,7 @@ from discord.ext import pages
 
 import wavelink
 
+from utils import CustomPage
 from utils.music import CoreFunctions
 
 
@@ -108,19 +109,11 @@ class QueueFunctions():
 				footer=footer,
 				thumbnail=thumbnail,
 			))
-		
-		pagebuttons = [
-			pages.PaginatorButton("first", label="<<", style=discord.ButtonStyle.secondary),
-			pages.PaginatorButton("prev", label="<", style=discord.ButtonStyle.secondary),
-			pages.PaginatorButton("page_indicator", style=discord.ButtonStyle.primary, disabled=True),
-			pages.PaginatorButton("next", label=">", style=discord.ButtonStyle.secondary),
-			pages.PaginatorButton("last", label=">>", style=discord.ButtonStyle.secondary),
-		]
 
 		paginator = pages.Paginator(
 			pages=embed_pages,
 			use_default_buttons=False,
-			custom_buttons=pagebuttons,
+			custom_buttons=CustomPage.BUTTONS,
 			disable_on_timeout=True,
 			timeout=30,
 		)
