@@ -1,4 +1,5 @@
 import asyncio
+import signal
 
 import discord
 
@@ -12,6 +13,11 @@ class SorceryBot(discord.Bot): # subclass discord.Bot
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 		self.add_listener(self.on_shutdown)
+		for signame in ("SIGINT", "SIGTERM"):
+			self.loop.add_signal_handler(
+				getattr(signal, signame),
+				lambda: asyncio.ensure_future(self.close())
+			)
 
 
 	async def on_ready(self):

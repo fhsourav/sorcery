@@ -123,7 +123,7 @@ class MusicCore(discord.Cog):
 
 	@discord.Cog.listener()
 	async def on_wavelink_track_start(self, payload: wavelink.TrackStartEventPayload):
-		"""When a track starts."""
+		"""When a track starts playing."""
 
 		player: wavelink.Player | None = payload.player
 		if not player:
@@ -174,7 +174,7 @@ class MusicCore(discord.Cog):
 
 	@discord.Cog.listener()
 	async def on_wavelink_track_end(self, payload: wavelink.TrackEndEventPayload):
-		"""When a track ends."""
+		"""When the current track has finished playing."""
 
 		player: wavelink.Player | None = payload.player
 		if not player:
@@ -188,6 +188,26 @@ class MusicCore(discord.Cog):
 
 		# if not player.current and player.queue.is_empty and self.autoplaymode == wavelink.AutoPlayMode.partial:
 		# 	await player.home.send("Player is inactive. Leaving after 2 minutes.")
+	
+
+	async def on_wavelink_track_exception(self, payload: wavelink.TrackExceptionEventPayload):
+		"""When an exception occurs while playing a track."""
+
+		player: wavelink.Player | None = payload.player
+		
+		await player.skip(force=True)
+
+		player.home.send(f"Error playing `{payload.track.title}`")
+
+	
+	async def on_wavelink_track_stuck(self, payload: wavelink.TrackStuckEventPayload):
+		"""When a track gets stuck while playing."""
+
+		player: wavelink.Player | None = payload.player
+
+		await player.skip(force=True)
+
+		player.home.send(f"Player got stuck playing `{payload.track.title}`. Skipping...")
 
 	
 	@discord.Cog.listener()
@@ -334,8 +354,60 @@ class MusicCore(discord.Cog):
 
 		player.queue.mode = loopmode
 
-		await ctx.respond(f"skipped {track.title} by {track.author}")		
+		await ctx.respond(f"Skipped `{track.title}`.")
+
+
+	@discord.slash_command(name="restart")
+	async def restart(self, ctx: discord.ApplicationContext):
+		"""Restart the current track."""
+		if not await CoreFunctions.check_voice(ctx):
+			return
+		
+		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
+
+		if not player.playing:
+			return await ctx.respond("No track is playing at the moment.", ephemeral=True)
+			
+		await player.seek()
+
+		if player.paused:
+			await player.pause(False)
+
+		await ctx.respond(f"Restarted `{player.current.title}`.")
 	
+
+	@discord.slash_command(name="seek")
+	@discord.option(
+		name="hour",
+		description="The hour value",
+		min_value=0,
+	)
+	@discord.option(
+		name="minute",
+		description="The minute value",
+		min_value=0,
+	)
+	@discord.option(
+		name="second",
+		description="The second value",
+		min_value=0,
+	)
+	async def seek(self, ctx: discord.ApplicationContext, hour: int = 0, minute: int = 0, second: int = 0):
+		"""Seek to the provided position in the currently playing track."""
+		if not await CoreFunctions.check_voice(ctx):
+			return
+		
+		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
+
+		seek_position = ((((hour * 60) + minute) * 60) + second) * 1000
+
+		if seek_position > player.current.length:
+			return await ctx.respond("Track length exceeded.", ephemeral=True)
+		
+		await player.seek(seek_position)
+
+		await ctx.respond(f"`{player.current.title}` seeked to {hour:02}:{minute:02}:{second:02}")
+
 
 	@discord.slash_command(name="pausetoggle")
 	async def pausetoggle(self, ctx: discord.ApplicationContext):
