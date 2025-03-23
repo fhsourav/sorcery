@@ -146,8 +146,6 @@ class MusicQueue(discord.Cog):
 
 		track = history_reversed[index - 1]
 
-		history.remove(track)
-
 		player.queue.put_at(0, track)
 
 		if not player.playing:

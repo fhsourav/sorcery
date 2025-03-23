@@ -23,15 +23,15 @@ Trying to build a full-fledged discord bot that can do almost everything.
 - [x] **autoplay history** *display the autoplay history*
 - [x] **autoplay mode** *set autoplay mode*
 - [x] **loop** *set loop mode*
-- [ ] **remove** *remove from queue*
-- [ ] **skipto** *skip to another track in the queue*
-- [ ] **shuffle** *shuffle the queue*
+- [x] **remove** *remove from queue*
+- [x] **skipto** *skip to another track in the queue*
+- [x] **shuffle** *shuffle the queue*
 
 ### Playback Position Controls
 
-- [ ] **seek**
-- [ ] **fastforward**
-- [ ] **rewind**
+- [x] **seek**
+- [x] **fastforward**
+- [x] **rewind**
 
 ### Sample Project Structure
 ```

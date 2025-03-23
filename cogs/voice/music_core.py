@@ -392,7 +392,7 @@ class MusicCore(discord.Cog):
 		description="The second value",
 		min_value=0,
 	)
-	async def seek(self, ctx: discord.ApplicationContext, hour: int = 0, minute: int = 0, second: int = 0):
+	async def seek(self, ctx: discord.ApplicationContext, hour: int, minute: int, second: int):
 		"""Seek to the provided position in the currently playing track."""
 		if not await CoreFunctions.check_voice(ctx):
 			return
@@ -407,6 +407,56 @@ class MusicCore(discord.Cog):
 		await player.seek(seek_position)
 
 		await ctx.respond(f"`{player.current.title}` seeked to {hour:02}:{minute:02}:{second:02}")
+
+
+	@discord.slash_command(name="rewind")
+	@discord.option(
+		name="value",
+		description="how far to rewind in seconds",
+		min_value=0,
+	)
+	async def rewind(self, ctx: discord.ApplicationContext, value: int = 10):
+		"""Rewind the track."""
+		if not await CoreFunctions.check_voice(ctx):
+			return
+		
+		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
+
+		if not player.playing:
+			return await ctx.respond("No tracks are currently being played.", ephemeral=True)
+		
+		ms = value * 1000
+
+		seek_position = max(0, player.position - ms)
+
+		await player.seek(seek_position)
+
+		await ctx.respond("The track has been rewinded.")
+
+
+	@discord.slash_command(name="fastforward")
+	@discord.option(
+		name="value",
+		description="how far to fast-forward in seconds",
+		min_value=0,
+	)
+	async def rewind(self, ctx: discord.ApplicationContext, value: int = 10):
+		"""Fast-forward the track."""
+		if not await CoreFunctions.check_voice(ctx):
+			return
+		
+		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
+
+		if not player.playing:
+			return await ctx.respond("No tracks are currently being played.", ephemeral=True)
+		
+		ms = value * 1000
+
+		seek_position = min(player.current.length, player.position + ms)
+
+		await player.seek(seek_position)
+
+		await ctx.respond("The track has been fast-forwarded.")
 
 
 	@discord.slash_command(name="pausetoggle")
