@@ -170,6 +170,10 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
+# vscode
+.vscode
+.github
+
 # Log file
 discord.log
 

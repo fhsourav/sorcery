@@ -8,8 +8,13 @@ import wavelink
 
 from utils.music import CoreFunctions
 
+
 class MusicCore(discord.Cog):
-	"""This cog contains the core music features."""
+	"""
+	A Discord cog that provides core music features using the Wavelink library.
+	
+	This cog handles music playback, voice channel management, and user interactions through slash commands.
+	"""
 	
 	def __init__(self, bot: discord.Bot):
 		self.bot = bot
@@ -17,16 +22,41 @@ class MusicCore(discord.Cog):
 
 	@discord.Cog.listener()
 	async def on_ready(self):
-		# I wanted to initialize this variable/const (whatever) in __init__
-		# but cogs are initialized before logging in
-		# so I was getting errors
-		# on_ready event listener works since it is accessed after the bot is logged in
+		"""
+		Event listener that is triggered when the bot is ready.
+
+		This method initializes variables that depend on the bot being logged in.
+		- `DISCONNECT_MESSAGE`: A message indicating the bot has disconnected gracefully.
+		- `search_results`: A dictionary for temporarily storing music search results.
+
+		Note:
+		These variables are initialized here instead of in `__init__` because
+		cogs are loaded before the bot logs in, which would cause errors if
+		these variables were accessed prematurely.
+		"""
 		self.DISCONNECT_MESSAGE = f"{self.bot.user.name} has gracefully left the stage. See you next time!"
 		self.search_results = {} # list of dict for temporarily storing music search results
 
 
 	async def empty_channel_timeout(self, player: wavelink.Player, msg: str):
-		"""Helper function: If no user in the voice channel that the player is connected to, disconnect after a timeout"""
+		"""
+		Disconnects the player from the voice channel after a period of inactivity.
+
+		This helper function checks if there are no users in the voice channel that the player is connected to.
+		If the channel remains empty for 2 minutes, the player disconnects and performs cleanup actions.
+
+		Params:
+			player (wavelink.Player): The player instance connected to the voice channel.
+			msg (str): A message to notify the channel about the impending disconnection.
+
+		Behavior:
+			- Sends a notification message to the channel about the timeout.
+			- Waits for 2 minutes (120 seconds) of inactivity.
+			- Clears search results, sends a disconnect message, resets the player's status, and disconnects the player.
+
+		Exceptions:
+			- Handles `asyncio.CancelledError` silently, allowing the timeout to be cancelled without side effects.
+		"""
 		try:
 			await player.home.send(f"{msg} Leaving after a timeout of 2 minutes.")
 			await asyncio.sleep(120) # 2 minutes (120 seconds) of inactivity
@@ -40,6 +70,16 @@ class MusicCore(discord.Cog):
 
 
 	def clear_empty_channel_timeout_task(self, player: wavelink.Player):
+		"""
+		Clears the empty channel timeout task for the given player.
+
+		This method checks if the player has an active `empty_channel_timeout_task`.
+		If the task exists and is not completed, it cancels the task and sets the
+		`empty_channel_timeout_task` attribute to None.
+
+		Params:
+			player (wavelink.Player): The player instance whose timeout task is to be cleared.
+		"""
 		if hasattr(player, "empty_channel_timeout_task") and player.empty_channel_timeout_task:
 			if not player.empty_channel_timeout_task.done():
 				player.empty_channel_timeout_task.cancel()
@@ -48,7 +88,34 @@ class MusicCore(discord.Cog):
 
 	@discord.Cog.listener()
 	async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
-		"""When a user changes their voice state."""
+		"""
+		Handles the `on_voice_state_update` event triggered when a user's voice state changes.
+		
+		This method is used to monitor the voice channel activity of the bot's player. It ensures
+		that the bot disconnects from the voice channel if it becomes inactive (i.e., no non-bot
+		users are present) for a specified timeout period. Additionally, it pauses/resumes playback
+		based on user activity in the voice channel.
+
+		Params:
+			member (discord.Member): The member whose voice state has changed.
+			before (discord.VoiceState): The member's previous voice state.
+			after (discord.VoiceState): The member's updated voice state.
+
+		Behavior:
+			- If the member is a bot, the method returns immediately.
+			- If the member's voice channel remains unchanged, the method returns.
+			- If the bot's player is not connected to a voice channel, the method returns.
+			- If a member leaves the bot's voice channel:
+				- If the channel becomes inactive (only bots remain), the bot pauses playback
+				  and starts a timeout task to disconnect after a specified period.
+			- If a member joins the bot's voice channel:
+				- If a timeout task is running, it is canceled, and playback is resumed if it
+				  was paused due to inactivity.
+		Notes:
+			- The method ensures that the bot does not interfere with other bots in the channel.
+			- Timeout tasks are managed to prevent unnecessary disconnections when users rejoin
+			  the channel before the timeout period ends.
+		"""
 
 		# This event is currently being used to check if there are any users
 		# in the voice channel that the player is connected to.
@@ -105,7 +172,17 @@ class MusicCore(discord.Cog):
 
 	@discord.Cog.listener()
 	async def on_shutdown(self):
-		"""Disconnects the Player."""
+		"""
+		Handles the shutdown process by disconnecting all active players.
+
+		This method iterates through all guilds the bot is connected to and checks
+		if there is an active voice client (player) in each guild. If a player is
+		found, it disconnects the player gracefully by calling the `disconnect_player` method.
+
+		Note:
+			This method is typically called during the bot's shutdown process to ensure
+			all resources are properly released and no players remain connected.
+		"""
 		for guild in self.bot.guilds:
 			player: wavelink.Player = cast(wavelink.Player, guild.voice_client)
 			if player:
@@ -113,6 +190,17 @@ class MusicCore(discord.Cog):
 
 	
 	async def disconnect_player(self, player: wavelink.Player):
+		"""
+		Disconnects the given player and performs necessary cleanup.
+
+		This method clears any timeout tasks associated with empty channels,
+		resets the search results, updates the player's channel status, sends
+		a disconnect message to the player's home channel, and disconnects
+		the player from the voice channel.
+
+		Params:
+			player (wavelink.Player): The player instance to disconnect.
+		"""
 		self.clear_empty_channel_timeout_task(player)
 		self.search_results.clear()
 		if player.channel.status == player.channel_status:
@@ -123,7 +211,35 @@ class MusicCore(discord.Cog):
 
 	@discord.Cog.listener()
 	async def on_wavelink_track_start(self, payload: wavelink.TrackStartEventPayload):
-		"""When a track starts playing."""
+		"""
+		Event handler for when a track starts playing in Wavelink.
+
+		This method is triggered when a `TrackStartEventPayload` is received, indicating
+		that a track has started playing. It updates the player's status, sends an embed
+		message to the designated channel, and handles additional metadata such as lyrics
+		and album information.
+
+		Params:
+			payload (wavelink.TrackStartEventPayload): The event payload containing details
+				about the track and player.
+
+		Behavior:
+			- Retrieves the player and track information from the payload.
+			- Constructs and sends a Discord embed with track details, including title,
+			  author, and artwork (if available).
+			- Handles additional metadata for the track, such as lyrics and album name,
+			  by making a request to the `lrclib` API.
+			- Updates the player's status and channel status to reflect the currently
+			  playing track.
+			- Handles edge cases where the player or track information is missing.
+
+		Notes:
+			- If the track was recommended or requested by a user, this information is
+			  appended to the embed description.
+			- If the track is instrumental, this is indicated in the lyrics section.
+			- The `CoreFunctions.get_player_state` method is used to generate the footer
+			  text for the embed.
+		"""
 
 		player: wavelink.Player | None = payload.player
 		if not player:
@@ -174,7 +290,18 @@ class MusicCore(discord.Cog):
 
 	@discord.Cog.listener()
 	async def on_wavelink_track_end(self, payload: wavelink.TrackEndEventPayload):
-		"""When the current track has finished playing."""
+		"""
+		Event handler triggered when a track finishes playing.
+
+		Params:
+			payload (wavelink.TrackEndEventPayload): The event payload containing
+			information about the track that ended and the associated player.
+
+		Behavior:
+			- Checks if the player instance exists; if not, handles the edge case.
+			- Resets the channel status if it matches the player's current status.
+			- Marks the player as inactive by setting `wavelink_is_inactive` to True.
+		"""
 
 		player: wavelink.Player | None = payload.player
 		if not player:
@@ -191,7 +318,17 @@ class MusicCore(discord.Cog):
 	
 
 	async def on_wavelink_track_exception(self, payload: wavelink.TrackExceptionEventPayload):
-		"""When an exception occurs while playing a track."""
+		"""
+		Handles exceptions that occur while playing a track.
+
+		This method is triggered when a `TrackExceptionEventPayload` is received,
+		indicating that an error occurred during track playback. It attempts to
+		skip the problematic track and notifies the user about the error.
+
+		Params:
+			payload (wavelink.TrackExceptionEventPayload): The event payload containing
+			details about the track exception, including the player and track information.
+		"""
 
 		player: wavelink.Player | None = payload.player
 		
@@ -201,7 +338,20 @@ class MusicCore(discord.Cog):
 
 	
 	async def on_wavelink_track_stuck(self, payload: wavelink.TrackStuckEventPayload):
-		"""When a track gets stuck while playing."""
+		"""
+		Event handler for when a track gets stuck while playing.
+
+		This method is triggered when a `TrackStuckEventPayload` is received,
+		indicating that the current track could not continue playing due to an issue.
+
+		Params:
+			payload (wavelink.TrackStuckEventPayload): The event payload containing
+			details about the stuck track and the player instance.
+
+		Behavior:
+			- Skips the currently stuck track by invoking the `skip` method on the player.
+			- Sends a notification to the player's home channel indicating the issue.
+		"""
 
 		player: wavelink.Player | None = payload.player
 
@@ -212,6 +362,17 @@ class MusicCore(discord.Cog):
 	
 	@discord.Cog.listener()
 	async def on_wavelink_inactive_player(self, player: wavelink.Player):
+		"""
+		Handles the event when a Wavelink player becomes inactive.
+
+		This method is triggered when a Wavelink player is detected as inactive.
+		It clears any scheduled tasks related to empty channel timeouts, clears
+		the search results, sends a notification message to the player's home
+		channel, and disconnects the player.
+
+		Params:
+			player (wavelink.Player): The Wavelink player instance that became inactive.
+		"""
 		self.clear_empty_channel_timeout_task(player)
 		self.search_results.clear()
 		await player.home.send(f"Inactivity detected. {self.DISCONNECT_MESSAGE}")
@@ -220,7 +381,28 @@ class MusicCore(discord.Cog):
 
 	@discord.slash_command(name="disconnect")
 	async def disconnect(self, ctx: discord.ApplicationContext):
-		"""Disconnects the Player."""
+		"""
+		Disconnects the player from the voice channel.
+
+		This method handles the disconnection of the Wavelink player from the voice channel.
+		It ensures that the player can be safely disconnected, clears any associated tasks,
+		and sends a response message to the user.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+
+		Behavior:
+			- Checks if the player can be disconnected using `CoreFunctions.check_voice`.
+			- Clears the empty channel timeout task associated with the player.
+			- Clears the search results cache.
+			- Resets the player's channel status if it matches the player's current status.
+			- Disconnects the player from the voice channel.
+			- Sends a response message to the user indicating the disconnection.
+
+		Note:
+			This method does not use `self.disconnect_player` since it directly responds
+			with a predefined disconnection message.
+		"""
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
 
 		# if the player cannot be disconnected for reasons such as the user not being in the channel
@@ -238,7 +420,32 @@ class MusicCore(discord.Cog):
 
 
 	async def autocomplete_query(self, ctx: discord.AutocompleteContext):
-		"""Autocompleting a `/play` query"""
+		"""
+		Autocompletes a `/play` query based on the user's input.
+
+		This method is used to provide autocomplete suggestions for a `/play` command
+		by searching for tracks or playlists based on the user's query.
+
+		Params:
+			ctx (discord.AutocompleteContext): The context of the autocomplete interaction,
+				containing user input and options.
+
+		Returns:
+			list[str]: A list of strings representing the autocomplete suggestions. If no
+			results are found, the list contains a message indicating no matches.
+
+		Behavior:
+			- Extracts the `source` and `playlist` options from the context.
+			- Searches for tracks or playlists using the `wavelink.Playable.search` method.
+			- If no results are found, returns the user's query or a default message.
+			- Stores the search results in `self.search_results` for the user, clearing any
+			  previous results for the same user.
+			- If the query is a playlist and the result is a playlist, stores the playlist
+			  in `self.search_results`. Otherwise, stores individual tracks with formatted
+			  strings as keys.
+			- Limits track title and author strings to 50 and 20 characters respectively
+			  for display purposes.
+		"""
 		
 		src = ctx.options["source"] # value passed for source: str
 		playlist = ctx.options["playlist"] # value passed for playlist: bool
@@ -283,19 +490,30 @@ class MusicCore(discord.Cog):
 	)
 	@discord.option(
 		name="query",
-		description="Search for the name or url of the track",
+		description="The search query or link of the track/playlist.",
 		autocomplete=autocomplete_query
 	)
 	@discord.option(
 		name="playlist",
-		description="If the query is a playlist",
+		description="If the query is for a playlist.",
 		choices=[
 			False,
 			True
 		]
 	)
 	async def play(self, ctx: discord.ApplicationContext, source: str, playlist: bool, query: str):
-		"""Play a song with the given query."""
+		"""
+		Play a track with the given query.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			source (str): The source of the track.
+			playlist (bool): Indicates whether the query is for a playlist or a single track.
+			query (str): The search query or link of the track/playlist.
+
+		Returns:
+			None
+		"""
 
 		# if the command was not invoked from a guild
 		# TODO some error checking
@@ -312,7 +530,17 @@ class MusicCore(discord.Cog):
 
 	@discord.slash_command(name="nowplaying")
 	async def nowplaying(self, ctx: discord.ApplicationContext):
-		"""Display information of the currently playing track."""
+		"""
+		Display information about the currently playing track.
+
+		This command retrieves the track information and sends an embedded message with the details.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -326,17 +554,34 @@ class MusicCore(discord.Cog):
 	@discord.slash_command(name="volume")
 	@discord.option(
 		name="value",
+		description="The desired volume level.",
 		max_value=200,
 		min_value=0,
 	)
 	async def volume(self, ctx: discord.ApplicationContext, value: int):
-		"""Set the volume of the player [0 - 200]"""
+		"""
+		Adjust the volume of the player (clipping may occur when the value exceeds 100).
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			value (int): The desired volume level, ranging from 0 to 200.
+		"""
 		await CoreFunctions.set_volume(ctx, value)
 
 	
 	@discord.slash_command(name="skip")
 	async def skip(self, ctx: discord.ApplicationContext):
-		"""Skip the current song."""
+		"""
+		Skip the currently playing song.
+
+		This command skips the current track, preserving the queue's loop mode.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+
+		Returns:
+			None
+		"""
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
 
 		if not await CoreFunctions.check_voice(ctx):
@@ -359,7 +604,18 @@ class MusicCore(discord.Cog):
 
 	@discord.slash_command(name="restart")
 	async def restart(self, ctx: discord.ApplicationContext):
-		"""Restart the current track."""
+		"""
+		Restart the currently playing track.
+
+		This command checks if a track is playing and seeks to the beginning of
+		the track and resumes playback if it was paused.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -393,7 +649,18 @@ class MusicCore(discord.Cog):
 		min_value=0,
 	)
 	async def seek(self, ctx: discord.ApplicationContext, hour: int, minute: int, second: int):
-		"""Seek to the provided position in the currently playing track."""
+		"""
+		Seek to a specific position in the currently playing track.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			hour (int): The hour value.
+			minute (int): The minute value.
+			second (int): The second value.
+
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -412,11 +679,17 @@ class MusicCore(discord.Cog):
 	@discord.slash_command(name="rewind")
 	@discord.option(
 		name="value",
-		description="how far to rewind in seconds",
+		description="The number of seconds to rewind the track.",
 		min_value=0,
 	)
 	async def rewind(self, ctx: discord.ApplicationContext, value: int = 10):
-		"""Rewind the track."""
+		"""
+		Rewind the currently playing track.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			value (int, optional): The number of seconds to rewind the track. Defaults to 10 seconds.
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -437,11 +710,17 @@ class MusicCore(discord.Cog):
 	@discord.slash_command(name="fastforward")
 	@discord.option(
 		name="value",
-		description="how far to fast-forward in seconds",
+		description="The number of seconds to fast-forward the track",
 		min_value=0,
 	)
-	async def rewind(self, ctx: discord.ApplicationContext, value: int = 10):
-		"""Fast-forward the track."""
+	async def fastforward(self, ctx: discord.ApplicationContext, value: int = 10):
+		"""
+		Fast-forward the currently playing track.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			value (int, optional): The number of seconds to fast-forward the track. Defaults to 10.
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -461,7 +740,14 @@ class MusicCore(discord.Cog):
 
 	@discord.slash_command(name="pausetoggle")
 	async def pausetoggle(self, ctx: discord.ApplicationContext):
-		"""Pause/resume playback."""
+		"""
+		Pause/resume playback.
+
+		Toggles the playback state of the player between paused and resumed.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+		"""
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
 		
 		if not await CoreFunctions.check_voice(ctx):
@@ -479,13 +765,37 @@ class MusicCore(discord.Cog):
 
 	@discord.slash_command(name="stop")
 	async def stop(self, ctx: discord.ApplicationContext):
-		"""Stops the player, clears the queue."""
+		"""
+		Stop the player.
+		
+		Stops the player and clears the current queue.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+
+		Returns:
+			None
+		"""
 		await CoreFunctions.stop(ctx)
 	
 
 	@discord.slash_command(name="lyrics")
 	async def lyrics(self, ctx: discord.ApplicationContext):
-		"""Display lyrics of the currently playing track."""
+		"""
+		Display lyrics of the currently playing track.
+
+		This method retrieves and displays the lyrics of the currently playing track
+		in the voice channel. If lyrics are available in the track's metadata,
+		it constructs and sends an embedded message containing the lyrics along with
+		track details such as artist, duration, album, and artwork. If no lyrics are
+		found, it sends an ephemeral message notifying the user.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+		Returns:
+			Coroutine: Sends an embedded message with lyrics or an ephemeral message
+			if no lyrics are found.
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		

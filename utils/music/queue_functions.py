@@ -10,23 +10,36 @@ from utils.music import CoreFunctions
 
 
 class QueueFunctions():
+	"""
+	QueueFunctions
+
+	A utility class for managing and generating paginated views of music queues in a Discord bot context. 
+	This class provides functionality to process different types of queues, including the current queue, 
+	queue history, autoplay queue, autoplay history, and saved playlists.
+	"""
 
 
 	def get_queue_paginator(ctx: discord.ApplicationContext, queue: wavelink.Queue | list, category: int):
 		"""
-		takes a queue, returns paginator with tracks in the queue.
+		Generates a paginator for displaying tracks in a queue or playlist.
 
-		params:
-			ctx (discord.ApplicationContext):
-			queue (wavelink.Queue | list): the queue / saved playlist that will be processed
-			category (int):
-				0 if processing current queue
-				1 if processing queue history
-				2 if processing autoplay queue
-				3 if processing autoplay history
-				4 if processing playlist
-		returns:
-			paginator
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			queue (wavelink.Queue | list): The queue or saved playlist to be processed.
+			category (int): Specifies the type of queue to process:
+				- 0: Current queue
+				- 1: Queue history
+				- 2: Autoplay queue
+				- 3: Autoplay history
+				- 4: Playlist
+
+		Returns:
+			pages.Paginator: A paginator object containing the queue or playlist tracks.
+
+		Notes:
+			- The paginator includes metadata such as the current playing track, queue type, and additional indicators like loop and shuffle states.
+			- If the queue is empty, an appropriate message is displayed based on the category.
+			- For queue history and autoplay history, the queue is reversed before processing.
 		"""
 
 		description = "" # We are using the description for nowplaying and to show the kind of queue it is

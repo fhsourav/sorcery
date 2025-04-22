@@ -9,6 +9,10 @@ from utils import CustomPage
 from utils.music import CoreFunctions
 
 class MusicFilters(discord.Cog):
+	"""
+	A Discord Cog that provides a set of commands to manage and apply various audio filters
+	to a music player using the Wavelink library.
+	"""
 
 	def __init__(self, bot: discord.Bot):
 		self.bot = bot

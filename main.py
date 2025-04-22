@@ -8,6 +8,7 @@ import logging
 # pycord
 import discord
 
+# importing the subclassed bot
 from utils.bot import SorceryBot
 
 

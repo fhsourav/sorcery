@@ -6,8 +6,11 @@ import wavelink
 
 from utils.music import CoreFunctions, QueueFunctions
 
+
 class MusicQueue(discord.Cog):
-	"""This cog contains the queue features."""
+	"""
+	A discord cog that provides various commands to manage wavelink player queue.	
+	"""
 
 	def __init__(self, bot: discord.Bot):
 		self.bot = bot
@@ -15,7 +18,20 @@ class MusicQueue(discord.Cog):
 	
 	@discord.slash_command(name="queue")
 	async def queue(self, ctx: discord.ApplicationContext):
-		"""Display the current queue."""
+		"""
+		Display the current queue.
+
+		This command retrieves and displays the current queue for the voice channel
+		the user is connected to. It checks if the user is in a valid voice channel, retrieves
+		the queue from the voice client's player, and uses a paginator to display the queue
+		interactively.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -30,7 +46,19 @@ class MusicQueue(discord.Cog):
 	
 	@discord.slash_command(name="history")
 	async def history(self, ctx: discord.ApplicationContext):
-		"""Display the queue history."""
+		"""
+		Display the queue history.
+
+		This command retrieves and displays the history of tracks that have been played
+		in the current voice channel session. It uses a paginator to handle the display
+		of the history in a user-friendly format.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -52,7 +80,19 @@ class MusicQueue(discord.Cog):
 		]
 	)
 	async def loop(self, ctx: discord.ApplicationContext, mode: int):
-		"""Select the loop mode."""
+		"""
+		Adjust the loop mode.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			mode (int): The loop mode to set.
+						0 - Disable looping.
+						1 - Loop the current track.
+						2 - Loop all tracks in the queue.
+
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -71,6 +111,7 @@ class MusicQueue(discord.Cog):
 
 	autoplay = discord.SlashCommandGroup(name="autoplay")
 
+
 	@autoplay.command(name="mode")
 	@discord.option(
 		name="mode",
@@ -87,13 +128,34 @@ class MusicQueue(discord.Cog):
 		]
 	)
 	async def set_autoplay(self, ctx: discord.ApplicationContext, mode: int):
-		"""Choose Autoplay Mode."""
+		"""
+		Set the autoplay mode.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			mode (int): The autoplay mode to set. This could represent different modes
+						(e.g., 0 for off, 1 for on, etc.).
+
+		Returns:
+			None
+		"""
 		await CoreFunctions.set_autoplay_mode(ctx, mode)
 
 
 	@autoplay.command(name="queue")
 	async def autoqueue(self, ctx: discord.ApplicationContext):
-		"""Display the autoplay queue."""
+		"""
+		Display the autoplay queue.
+
+		This command retrieves the autoplay queue associated with the current voice client.
+		The queue is displayed using a paginator for better readability.
+		
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+		
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -106,7 +168,19 @@ class MusicQueue(discord.Cog):
 
 	@autoplay.command(name="history")
 	async def autohistory(self, ctx: discord.ApplicationContext):
-		"""Display the autoplay queue history."""
+		"""
+		Display the autoplay queue history.
+
+		This command retrieves and displays the history of tracks that have been 
+		played in the autoplay queue. It uses a paginator to format the history 
+		into pages for easier navigation.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -125,10 +199,24 @@ class MusicQueue(discord.Cog):
 	)
 	@discord.option(
 		name="autoplay",
-		description="If the track exists in the autoplay history",
+		description="If replaying from the autoplay history.",
 	)
 	async def replay(self, ctx: discord.ApplicationContext, index: int, autoplay: bool = False):
-		"""Replay a song from history/autoplay history. Skips the current song."""
+		"""
+		Replay a song from the playback history or autoplay history.
+
+		This method allows the user to replay a specific song from the history
+		of previously played tracks or the autoplay history. It skips the 
+		currently playing song and starts playing the selected track.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			index (int): The 1-based index of the song in the history to replay.
+			autoplay (bool, optional): Whether to replay from the autoplay history. Defaults to False.
+
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -168,7 +256,17 @@ class MusicQueue(discord.Cog):
 		min_index=1,
 	)
 	async def swap(self, ctx: discord.ApplicationContext, index1: int, index2: int):
-		"""Swap two tracks in the queue by index."""
+		"""
+		Swap two tracks in the music queue by their indices.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			index1 (int): The 1-based index of the first track to swap.
+			index2 (int): The 1-based index of the second track to swap.
+
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -194,7 +292,17 @@ class MusicQueue(discord.Cog):
 
 	@discord.slash_command(name="shuffle")
 	async def shuffle(self, ctx: discord.ApplicationContext):
-		"""Shuffle the queue."""
+		"""
+		Shuffle the queue.
+
+		This command shuffles the order of tracks in the player's queue.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the command invocation.
+
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -212,7 +320,13 @@ class MusicQueue(discord.Cog):
 		min_value=1,
 	)
 	async def skipto(self, ctx: discord.ApplicationContext, index: int):
-		"""Skip to another track in the queue. Use autoplay queue if queue is empty."""
+		"""
+		Skip to another track in the queue at the specified index. Autoplay queue is used if queue is empty and autoplay is enabled.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			index (int): The 1-based index of the track to skip to in the queue.
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -254,7 +368,16 @@ class MusicQueue(discord.Cog):
 		min_value=1,
 	)
 	async def delete(self, ctx: discord.ApplicationContext, index: int):
-		"""Delete a track from the queue by index."""
+		"""
+		Delete a track from the queue by its index.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			index (int): The 1-based index of the track to delete from the queue.
+
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -274,7 +397,15 @@ class MusicQueue(discord.Cog):
 
 	@clear.command(name="queue")
 	async def clear_queue(self, ctx: discord.ApplicationContext):
-		"""Clear the queue."""
+		"""
+		Clear the queue.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+		
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -287,7 +418,17 @@ class MusicQueue(discord.Cog):
 
 	@clear.command(name="history")
 	async def clear_history(self, ctx: discord.ApplicationContext):
-		"""Clear queue history."""
+		"""
+		Clear the queue history.
+
+		This command removes all previously played tracks from the queue's history.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -303,7 +444,17 @@ class MusicQueue(discord.Cog):
 
 	@clear_autoplay.command(name="queue")
 	async def clear_autoqueue(self, ctx: discord.ApplicationContext):
-		"""Clear autoplay queue."""
+		"""
+		Clear the autoplay queue.
+
+		This command clears the autoplay queue associated with the Wavelink player.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -316,7 +467,17 @@ class MusicQueue(discord.Cog):
 
 	@clear_autoplay.command(name="history")
 	async def clear_autoqueue_history(self, ctx: discord.ApplicationContext):
-		"""Clear autoplay queue history."""
+		"""
+		Clear the autoplay queue history.
+
+		This command clears the history of the autoplay queue associated with the current Wavelink player.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -329,9 +490,21 @@ class MusicQueue(discord.Cog):
 
 	reset = discord.SlashCommandGroup(name="reset", description="Reset queue history.")
 
+
 	@reset.command(name="queue")
 	async def reset_queue(self, ctx: discord.ApplicationContext):
-		"""Reset the queue."""
+		"""
+		Reset the queue.
+
+		This command clears the current music queue associated with the voice client
+		in the context.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+		
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		
@@ -344,7 +517,17 @@ class MusicQueue(discord.Cog):
 
 	@reset.command(name="autoplay")
 	async def reset_autoplay(self, ctx: discord.ApplicationContext):
-		"""Reset the autoplay queue."""
+		"""
+		Reset the autoplay queue.
+
+		This command resets the autoplay queue associated with the current Wavelink player instance.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+
+		Returns:
+			None
+		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
 		

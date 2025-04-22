@@ -6,13 +6,29 @@ import wavelink
 
 
 class ConnectLavalink(discord.Cog):
-	"""This cog connects to the lavalink server."""
+	"""
+	A Discord Cog for managing Lavalink connections and node events.
+
+	This cog handles the connection to Lavalink nodes for music playback functionality,
+	including initialization, connection management, and event handling for node status changes.
+	"""
 
 	def __init__(self, bot: discord.Bot):
 		self.bot = bot
 
 	async def connect_nodes(self):
-		"""Connect to Lavalink nodes."""
+		"""Connect to Lavalink nodes.
+
+		This method establishes connections to the configured Lavalink nodes for audio streaming.
+		It waits for the bot to be ready before attempting to connect.
+
+		The node configuration includes:
+		- A random unique identifier
+		- URI from environment variable LAVALINK_SERVER_ADDRESS
+		- Password from environment variable LAVALINK_SERVER_PASSWORD
+		- Inactive player timeout of 120 seconds
+		The connection is made with a cache capacity of 100 (experimental feature).
+		"""
 		await self.bot.wait_until_ready() # wait until the bot is ready
 
 		nodes = [
@@ -32,28 +48,60 @@ class ConnectLavalink(discord.Cog):
 	
 	@discord.Cog.listener()
 	async def on_ready(self):
-		"""When the bot is ready."""
+		"""
+		Event handler that triggers when the bot becomes ready.
+
+		This method executes when the Discord bot has successfully connected and is ready
+		to receive commands. It automatically connects to configured Lavalink nodes for
+		music functionality.
+		"""
 		await self.connect_nodes() # Connect to the lavalink server
 
 	
 	@discord.Cog.listener()
 	async def on_shutdown(self):
-		"""Closing the bot"""
+		"""
+		Handles the shutdown process for Lavalink connection.
+
+		This coroutine is called when the bot is shutting down. It ensures proper cleanup
+		by closing all connected Lavalink nodes and terminating audio connections.
+		"""
 		print("Closing connected Lavalink Nodes.")
 		await wavelink.Pool.close()
 
 	
 	@discord.Cog.listener()
 	async def on_wavelink_node_ready(self, payload: wavelink.NodeReadyEventPayload):
-		"""Everytime a node is successfully connected."""
+		"""
+		Event handler for when a Wavelink node becomes ready.
 
+		This method is triggered whenever a Wavelink node successfully connects to the bot.
+		It prints connection details including the node identifier and session resume status.
+
+		Params:
+			payload (wavelink.NodeReadyEventPayload): The payload containing information about the connected node
+
+		Returns:
+			None
+		"""
 		print(f"Node with ID {payload.node.identifier} has connected")
 		print(f"Resumed session: {payload.resumed}")
 
 	
 	@discord.Cog.listener()
 	async def on_wavelink_node_closed(self, node: wavelink.Node, disconnected: list[wavelink.Player]):
-		"""Everytime a node is closed."""
+		"""
+		Event handler triggered when a Wavelink node is closed.
+
+		Params:
+			node (wavelink.Node): The Wavelink node that was closed.
+			disconnected (list[wavelink.Player]): A list of players that were disconnected 
+			as a result of the node closure.
+
+		This method is called automatically by the Wavelink library whenever a node
+		is closed. It can be used to handle cleanup or logging related to the node
+		closure.
+		"""
 		print(f"Node with ID {node.identifier} has closed.")
 
 

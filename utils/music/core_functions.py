@@ -11,19 +11,28 @@ import wavelink
 
 class CoreFunctions():
 	"""
-	Core music functions.
+	CoreFunctions
+
+	This class contains core music-related functions for a Discord bot using Wavelink. 
+	It provides utilities for managing playback, interacting with voice channels, 
+	and handling tracks and playlists.
 	"""
 
 	def milli_to_minutes(milli: int) -> str:
 		"""
-		Converting milliseconds to understandable output (mm:ss)
+		Converts a duration from milliseconds to a formatted string in the format mm:ss.
 
-		Wavelink track lengths are given as milliseconds. So, we need to convert it.
+		This function is useful for converting track lengths or other time durations 
+		provided in milliseconds into a more human-readable format.
 
-		params:
-			milli (int): milliseconds
-		returns:
-			(str): A string representation of the converted time
+		(Wavelink track lengths are given in milliseconds.)
+
+		Params:
+			milli (int): The duration in milliseconds.
+
+		Returns:
+			str: The formatted time string in the format mm:ss, where mm represents 
+				 minutes and ss represents seconds, both zero-padded to two digits.
 		"""
 		seconds = (milli // 1000) % 60
 		minutes = milli // (1000 * 60)
@@ -32,18 +41,20 @@ class CoreFunctions():
 
 	async def check_voice(ctx: discord.ApplicationContext, disconnect: bool = False) -> bool:
 		"""
-		Checks if the command can be executed.
+		Checks if the command can be executed in the current context.
 
-		Checks if a player exists.
-		Checks if the command has been issued from a valid channel.
-		Checks if the user is connected to the same voice channel as the player.
-		if True is passed in disconnect, checks if the channel is empty.
+		This function performs several checks to ensure the command can be executed:
+		1. Verifies if a player exists and is connected to a voice channel.
+		2. Ensures the command is issued from the channel linked to the player.
+		3. Confirms the user is connected to the same voice channel as the player.
+		4. If `disconnect` is True, checks if the voice channel is empty.
 
-		params:
-			ctx (discord.ApplicationContext): the context of the issued command
-			disconnect (bool):
-		returns:
-			(bool): True if the command can be executed, False otherwise.
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			disconnect (bool, optional): If True, checks if the voice channel is empty. Defaults to False.
+
+		Returns:
+			bool: True if the command can be executed, False otherwise.
 		"""
 		
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
@@ -71,13 +82,29 @@ class CoreFunctions():
 
 	async def play(ctx: discord.ApplicationContext, playable_item: wavelink.Playable | wavelink.Playlist):
 		"""
-		Join a voice channel (if not in a voice channel) and play
+		Plays a track or playlist in a voice channel.
 
-		params:
-			ctx (discord.ApplicationContext): the context of the issued command
-			playable_item (wavelink.Playable | wavelink.Playlist): the track or playlist to be played
-		returns:
-			void
+		This function ensures the bot is connected to a voice channel, locks the player to the current text channel, 
+		and adds the provided track or playlist to the queue. If the player is not already playing, it starts playback.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			playable_item (wavelink.Playable | wavelink.Playlist): The track or playlist to be played.
+
+		Returns:
+			void: This function does not return a value.
+
+		Behavior:
+			- If the bot is not connected to a voice channel, it attempts to connect to the author's current voice channel.
+			- Ensures the player is locked to the current text channel and prevents usage from other channels.
+			- Adds the provided track or playlist to the queue.
+			- If the player is idle, starts playback with the first item in the queue.
+			- Sets default autoplay mode and volume if the player is joining for the first time.
+			- Responds with appropriate messages for various scenarios, such as the user not being in a voice channel or the bot being unable to join.
+
+		Raises:
+			AttributeError: If the author is not in a voice channel.
+			discord.ClientException: If the bot fails to join the voice channel.
 		"""
 		# First we may define our voice client,
 		# for this, we are going to use typing.cast()
@@ -138,12 +165,18 @@ class CoreFunctions():
 	
 	async def stop(ctx: discord.ApplicationContext):
 		"""
-		Stops playback, clears the queue.
+		Stops playback and clears the queue.
 
-		params:
-			ctx (discord.ApplicationContext): the context of the issued command
-		returns:
-			(bool): True if stopped successfully, False otherwise
+		This function halts the current playback in the voice channel, clears the 
+		entire queue of tracks, and temporarily adjusts the autoplay mode to ensure 
+		playback is stopped. It then restores the previous autoplay mode after 
+		stopping.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+
+		Returns:
+			bool: True if playback was stopped successfully, False otherwise.
 		"""
 		if not await CoreFunctions.check_voice(ctx):
 			return
@@ -166,11 +199,20 @@ class CoreFunctions():
 
 	async def set_autoplay_mode(ctx: discord.ApplicationContext, mode: int):
 		"""
-		Sets autoplay mode
+		Sets the autoplay mode for the music player.
 
-		params:
-			ctx (discord.ApplicationContext): the context of the issued command
-			mode (int): the autoplay mode; 0 = wavelink.AutoPlayMode.partial; 1 = wavelink.AutoPlayMode.enabled
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			mode (int): The autoplay mode to set. 
+						Use 0 for `wavelink.AutoPlayMode.partial` (autoplay disabled) 
+						or 1 for `wavelink.AutoPlayMode.enabled` (autoplay enabled).
+
+		Returns:
+			None: Sends a response message indicating whether autoplay has been enabled or disabled.
+
+		Notes:
+			This function checks if the user is in a valid voice channel before proceeding.
+			It modifies the `autoplay` attribute of the `wavelink.Player` instance associated with the voice client.
 		"""
 
 		if not await CoreFunctions.check_voice(ctx=ctx):
@@ -188,11 +230,18 @@ class CoreFunctions():
 
 	async def set_volume(ctx: discord.ApplicationContext, value: int):
 		"""
-		Sets the volume.
+		Sets the volume for the music player.
 
-		params:
-			ctx (discord.ApplicationContext): the context of the issued command
-			value (int): the value of the desired volume [0 - 100]
+		This function adjusts the playback volume of the music player associated with the 
+		current voice client in the Discord context. It ensures that the user is connected 
+		to a voice channel and that the bot is properly configured before setting the volume.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the issued command.
+			value (int): The desired volume level, ranging from 0 (mute) to 100 (maximum volume).
+
+		Returns:
+			None: This function sends a response to the user indicating the new volume level.
 		"""
 
 		if not await CoreFunctions.check_voice(ctx=ctx):
@@ -206,6 +255,19 @@ class CoreFunctions():
 
 
 	def get_player_state(player: wavelink.Player):
+		"""
+		Retrieve the current state of the music player, including loop mode, volume, and autoplay status.
+
+		Params:
+			player (wavelink.Player): The music player instance to retrieve the state from.
+
+		Returns:
+			str: A formatted string representing the player's state, including:
+				- Loop mode (🔁 for loop all, 🔂 for loop one, 🚫 for no loop)
+				- Volume level (🔇 for muted, 🔈 for low, 🔉 for medium, 🔊 for high, 🚨 for above 100%)
+				- Autoplay status (♾️ for enabled, ❎ for disabled, or "play one and stop" for partial mode)
+			None: If the player instance is not provided.
+		"""
 		if not player:
 			return
 
@@ -217,10 +279,34 @@ class CoreFunctions():
 
 
 	def add_track_extras(track: wavelink.Playable, author_id: int):
+		"""
+		Adds additional metadata to a track object.
+
+		This function attaches extra information to a track object, including
+		the ID of the user who requested the track and the timestamp when the
+		track was added.
+
+		Params:
+			track (wavelink.Playable): The track object to which extras will be added.
+			author_id (int): The ID of the user who requested the track.
+
+		Returns:
+			None
+		"""
 		track.extras = {"requester_id": author_id, "added_at": int(time.time())}
 
 
 	def get_track_info_embed(ctx: discord.ApplicationContext, track: wavelink.Playable):
+		"""
+		Generates a Discord embed containing detailed information about a track.
+
+		Params:
+			ctx (discord.ApplicationContext): The context of the Discord command.
+			track (wavelink.Playable): The track object containing metadata about the track.
+
+		Returns:
+			discord.Embed: A Discord embed object populated with track information.
+		"""
 
 		player: wavelink.Player = cast(wavelink.Player, ctx.voice_client)
 
