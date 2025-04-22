@@ -321,7 +321,7 @@ class MusicQueue(discord.Cog):
 	)
 	async def skipto(self, ctx: discord.ApplicationContext, index: int):
 		"""
-		Skip to another track in the queue at the specified index. Autoplay queue is used if queue is empty and autoplay is enabled.
+		Skip to the track at the specified index. Autoplay queue is used if queue is empty.
 
 		Params:
 			ctx (discord.ApplicationContext): The context of the issued command.
