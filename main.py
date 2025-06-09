@@ -9,7 +9,7 @@ import logging
 import discord
 
 # importing the subclassed bot
-from utils.bot import SorceryBot
+from bot import SorceryBot
 
 
 # logging for discord
