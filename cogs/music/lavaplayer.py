@@ -33,6 +33,7 @@ class LavaPlayer(discord.Cog):
 		self.lavalink: lavalink.Client = self.bot.lavalink
 		self.lavalink.add_event_hooks(self)
 
+
 	@lavalink.listener(lavalink.TrackStartEvent)
 	async def on_track_start(self, event: lavalink.TrackStartEvent):
 		guild_id = event.player.guild_id

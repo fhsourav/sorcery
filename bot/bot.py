@@ -43,7 +43,7 @@ class SorceryBot(discord.Bot):
 		tasks to complete, and then proceeds to close the bot connection.
 		"""
 		self.dispatch("shutdown") # triggers `on_shutdown`
-		# await asyncio.sleep(10) # sleep to let `on_shutdown` to complete
+		await asyncio.sleep(2) # sleep to let `on_shutdown` to complete
 		print("shutting down gracefully.")
 		print("----------")
 		return await super().close()

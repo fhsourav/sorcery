@@ -29,6 +29,8 @@ class LavalinkVoiceClient(discord.VoiceProtocol):
 				region='bd',
 				name='default-node'
 			)
+
+			print("Node added")
 		
 		# Create a shortcut to the Lavalink client here.
 		self.lavalink = self.client.lavalink
