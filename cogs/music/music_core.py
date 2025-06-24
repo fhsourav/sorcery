@@ -34,7 +34,6 @@ class MusicCore(discord.Cog):
 			await MusicCoreService.play(ctx, self.search_results[ctx.author.id][query])
 		else:
 			await ctx.respond("Interaction failed.", ephemeral=True)
-			await MusicCoreService.disconnect(ctx)
 	
 
 	@discord.slash_command(name="disconnect")

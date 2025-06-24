@@ -9,7 +9,7 @@ from discord.ext import commands
 from bot import LavalinkVoiceClient, Utils
 
 
-# url_rx = re.compile(r'https?://(?:www\.)?.+')
+url_rx = re.compile(r"^(?:(?:https?|ftp):\/\/)?(?:www\.)?(?:(?:[a-zA-Z0-9\-]+\.)+[a-zA-Z]{2,}|(?:\d{1,3}\.){3}\d{1,3})(?::\d{1,5})?(?:/[^\s]*)?$")
 
 
 class MusicCoreService:
@@ -113,6 +113,11 @@ class MusicCoreService:
 
 		src = "" if ctx.options["source"] is None else ctx.options["source"]
 
+		if not src:
+			if url_rx.match(ctx.value):
+				self.search_results[ctx.interaction.user.id][ctx.value] = ctx.value
+			return [ctx.value] if url_rx.match(ctx.value) else ["Enter a valid URL."]
+
 		# print(f'{src}{ctx.value}')
 
 		search_result: lavalink.LoadResult = await ctx.bot.lavalink.get_tracks(f'{src}{ctx.value}') # generating tracklist from the value of the query
@@ -134,7 +139,7 @@ class MusicCoreService:
 		]
 
 
-	async def play(ctx: discord.ApplicationContext, results: Union[lavalink.AudioTrack, lavalink.DeferredAudioTrack, lavalink.LoadResult]):
+	async def play(ctx: discord.ApplicationContext, results: Union[str, lavalink.AudioTrack, lavalink.DeferredAudioTrack, lavalink.LoadResult]):
 		"""
 		Searches and plays a song from a given query.
 		"""
@@ -166,6 +171,10 @@ class MusicCoreService:
 		# elif results.load_type == lavalink.LoadType.PLAYLIST:
 		# 	tracks = results.tracks
 
+		if isinstance(results, str):
+			results = await player.node.get_tracks(results)
+			results = results.tracks[0]
+
 		if isinstance(results, lavalink.LoadResult):
 			tracks = results.tracks
 			# Add all of the tracks from the playlist to the queue.
@@ -173,7 +182,7 @@ class MusicCoreService:
 				# requester isn't necessary but it helps keep track of who queued what.
 				# You can store additional metadata by passing it as a kwarg (i.e. key=value)
 				player.add(track=track, requester=ctx.author.id)
-			
+
 			# embed.title = 'Playlist Enqueued!'
 			# embed.description = f'{results.playlist_info.name} - {len(tracks)} tracks'
 			response_msg = f"Added the playlist **`{results.playlist_info.name}`** ({len(tracks)} tracks) to the queue."
