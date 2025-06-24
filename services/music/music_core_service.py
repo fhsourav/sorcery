@@ -1,5 +1,5 @@
 import re
-from typing import cast
+from typing import Union
 
 import discord
 import lavalink
@@ -106,46 +106,43 @@ class MusicCoreService:
 			- Limits track title and author strings to 50 and 20 characters respectively
 			  for display purposes.
 		"""
-		
-		src = ctx.options["source"] # value passed for source: str
-		playlist = ctx.options["playlist"] # value passed for playlist: bool
-
-		search_result: lavalink.LoadResult = await ctx.bot.lavalink.get_tracks(f'{src}{ctx.value}') # generating tracklist from the value of the query
-		
-		# if tracklist is empty, return the value of the query
-		if search_result.load_type == lavalink.LoadType.EMPTY or search_result.load_type == lavalink.LoadType.ERROR:
-			return [f"{ctx.value}" if ctx.value else "Could not find anything for that query."]
-		
 		if not ctx.interaction.user.id in self.search_results:
 			self.search_results[ctx.interaction.user.id] = {}
 		else:
 			self.search_results[ctx.interaction.user.id].clear() # clear previous query info (if any) from the self.tracks dictionary
 
-		if playlist: # if the query is a playlist
-			if search_result.load_type == lavalink.LoadType.PLAYLIST: # check if the result is also a playlist
-				self.search_results[ctx.interaction.user.id][search_result.playlist_info.name] = search_result # put the playlist in self.tracks
-			else:
-				self.search_results[ctx.interaction.user.id]["No playlist found."] = None
-		else:
-			# if not, create separate entry for all the tracks
-			for track in search_result.tracks:
-				track_str = f"[{Utils.milli_to_minutes(track.duration)}] {track.title[:50]} by {track.author[:20]} ({track.source_name})" # length of name must be between 0 to 100; slicing title and author to 50 and 20 characters respectively
-				self.search_results[ctx.interaction.user.id][track_str] = track # store the track
+		src = "" if ctx.options["source"] is None else ctx.options["source"]
+
+		# print(f'{src}{ctx.value}')
+
+		search_result: lavalink.LoadResult = await ctx.bot.lavalink.get_tracks(f'{src}{ctx.value}') # generating tracklist from the value of the query
+		
+		# if tracklist is empty, return the value of the query
+		if search_result.load_type == lavalink.LoadType.EMPTY or search_result.load_type == lavalink.LoadType.ERROR:
+			return ["Could not find anything for that query."]
+		
+		if search_result.load_type == lavalink.LoadType.PLAYLIST: # check if the result is also a playlist
+			self.search_results[ctx.interaction.user.id][search_result.playlist_info.name[:100]] = search_result
+		# else:
+		# 	# if not, create separate entry for all the tracks
+		for track in search_result.tracks:
+			track_str = f"[{Utils.milli_to_minutes(track.duration)}] {track.title[:50]} by {track.author[:20]} ({track.source_name})" # length of name must be between 0 to 100; slicing title and author to 50 and 20 characters respectively
+			self.search_results[ctx.interaction.user.id][track_str] = track # store the track
 
 		return [
 			track_str for track_str in self.search_results[ctx.interaction.user.id]
 		]
 
 
-	async def play(ctx: discord.ApplicationContext, source: str, playlist: bool, query: str):
+	async def play(ctx: discord.ApplicationContext, results: Union[lavalink.AudioTrack, lavalink.DeferredAudioTrack, lavalink.LoadResult]):
 		"""
 		Searches and plays a song from a given query.
 		"""
 		# Get the player for this gild from cache.
 		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
 		# Remove leading and trailing <>. <> may be used to suppress embedding links in Discord.
-		query = f'{source}{query}'
-		print(query)
+		# query = f'{source}{query}'
+		# print(query)
 
 		# Check if the user input might be a URL. If it isn't, we can Lavalink do a YouTube search for it instead.
 		# SoundCloud searching is possible by prefixing "scsearch:" instead.
@@ -153,9 +150,10 @@ class MusicCoreService:
 		# 	query = f'ytsearch:{query}'
 		
 		# Get the results for the query from Lavalink.
-		results = await player.node.get_tracks(query)
+		# results = await player.node.get_tracks(query)
 
-		embed = discord.Embed(color=discord.Color.blurple())
+		# embed = discord.Embed(color=discord.Color.blurple())
+		# response_msg = ""
 
 		# Valid load_types are:
 		# 	TRACK		- direct URL to a track
@@ -163,27 +161,32 @@ class MusicCoreService:
 		# 	SEARCH		- query prefixed with either "ytsearch:" or "scsearch:". This could possibly be expanded with plugins.
 		# 	EMPTY		- no results for the query (result.tracks will be empty)
 		# 	ERROR		- the track encountered an exception during loading
-		if results.load_type == lavalink.LoadType.EMPTY:
-			return await ctx.respond("I couldn't find any tracks for that query.")
-		elif results.load_type == lavalink.LoadType.PLAYLIST:
-			tracks = results.tracks
+		# if results.load_type == lavalink.LoadType.EMPTY:
+		# 	return await ctx.respond("I couldn't find any tracks for that query.")
+		# elif results.load_type == lavalink.LoadType.PLAYLIST:
+		# 	tracks = results.tracks
 
+		if isinstance(results, lavalink.LoadResult):
+			tracks = results.tracks
 			# Add all of the tracks from the playlist to the queue.
 			for track in tracks:
 				# requester isn't necessary but it helps keep track of who queued what.
 				# You can store additional metadata by passing it as a kwarg (i.e. key=value)
 				player.add(track=track, requester=ctx.author.id)
 			
-			embed.title = 'Playlist Enqueued!'
-			embed.description = f'{results.playlist_info.name} - {len(tracks)} tracks'
+			# embed.title = 'Playlist Enqueued!'
+			# embed.description = f'{results.playlist_info.name} - {len(tracks)} tracks'
+			response_msg = f"Added the playlist **`{results.playlist_info.name}`** ({len(tracks)} tracks) to the queue."
+
 		else:
-			track = results.tracks[0]
-			embed.title = 'Track Enqueued!'
-			embed.description = f'[{track.title}]({track.uri})'
+			track = results
+			# embed.title = 'Track Enqueued!'
+			# embed.description = f'[{track.title}]({track.uri})'
+			response_msg = f"Added **`{track.title}`** to the queue."
 
 			player.add(track=track, requester=ctx.author.id)
 		
-		await ctx.respond(embed=embed)
+		await ctx.respond(response_msg)
 
 		# We don't want to call .play() if the player is playing as that will effectively
 		# skip the current track

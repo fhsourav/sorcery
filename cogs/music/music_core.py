@@ -20,7 +20,7 @@ class MusicCore(discord.Cog):
 			discord.OptionChoice(name="YouTube Music", value="ytmsearch:"),
 			discord.OptionChoice(name="YouTube", value="ytsearch:"),
 			discord.OptionChoice(name="SoundCloud", value="scsearch:"),
-			discord.OptionChoice(name="Any link", value="")
+			discord.OptionChoice(name="Link (playlist or any)", value="")
 		]
 	)
 	@discord.option(
@@ -28,17 +28,13 @@ class MusicCore(discord.Cog):
 		description="The search query or link of the track/playlist.",
 		autocomplete=MusicCoreService.autocomplete_query
 	)
-	@discord.option(
-		name="isplaylist",
-		description="If the query is for a playlist.",
-		choices=[
-			True,
-			False
-		]
-	)
 	@commands.check(MusicCoreService.create_player)
-	async def play(self, ctx: discord.ApplicationContext, source: str, playlist: bool, query: str):
-		await MusicCoreService.play(ctx, source, playlist, query)
+	async def play(self, ctx: discord.ApplicationContext, source: str, query: str):
+		if query in self.search_results[ctx.author.id]:
+			await MusicCoreService.play(ctx, self.search_results[ctx.author.id][query])
+		else:
+			await ctx.respond("Interaction failed.", ephemeral=True)
+			await MusicCoreService.disconnect(ctx)
 	
 
 	@discord.slash_command(name="disconnect")
