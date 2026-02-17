@@ -34,10 +34,14 @@ An all-in-one bot.
 # intents
 intents = discord.Intents.default()
 
+# debug guilds
+debug_guilds = [980222700964438097,]
+
 # the bot
 bot = SorceryBot(
 	description=description,
 	intents=intents,
+	debug_guilds=debug_guilds
 )
 
 # loading cogs (if there are multiple cog folders, the way to load them has to be altered accordingly)

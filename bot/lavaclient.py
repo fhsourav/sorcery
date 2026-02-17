@@ -1,3 +1,7 @@
+# loading lavalink credentials from .env
+import os
+from dotenv import load_dotenv
+
 import discord
 import lavalink
 
@@ -21,12 +25,16 @@ class LavalinkVoiceClient(discord.VoiceProtocol):
 			# Instantiate a client if one doesn't exist
 			# We store it in `self.client` so that it may persist across cog reloads,
 			# however this is not mandatory
+			load_dotenv()
+			lavalink_address = os.getenv('LAVALINK_SERVER_ADDRESS')
+			host, port = lavalink_address.split(':') # the 'https://' part may cause trouble
+			password = os.getenv('LAVALINK_SERVER_PASSWORD')
 			self.client.lavalink = lavalink.Client(client.user.id)
 			self.client.lavalink.add_node(
-				host='192.168.1.234',
-				port='2333',
-				password='youshallnotpass',
-				region='bd',
+				host=host,
+				port=port,
+				password=password,
+				region='us',
 				name='default-node'
 			)
 

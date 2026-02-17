@@ -1,7 +1,4 @@
 py-cord[voice,speed]
 lavalink
 python-dotenv
-aiohappyeyeballs
-async-timeout
-sqlalchemy
 requests

@@ -1,7 +1,13 @@
+# loading lavalink credentials from .env
+import os
+from dotenv import load_dotenv
+
 import requests
 
 import discord
 import lavalink
+
+from services.music.music_core_service import MusicCoreService
 
 
 class LavaPlayer(discord.Cog):
@@ -23,11 +29,15 @@ class LavaPlayer(discord.Cog):
 	@discord.Cog.listener()
 	async def on_ready(self):
 		if not hasattr(self.bot, 'lavalink'):
+			load_dotenv()
+			lavalink_address = os.getenv('LAVALINK_SERVER_ADDRESS')
+			host, port = lavalink_address.split(':') # the 'https://' part may cause trouble
+			password = os.getenv('LAVALINK_SERVER_PASSWORD')
 			self.bot.lavalink = lavalink.Client(self.bot.user.id)
 			self.bot.lavalink.add_node(
-				host='192.168.1.234',
-				port=2333,
-				password='youshallnotpass',
+				host=host,
+				port=port,
+				password=password,
 				region='us',
 				name='default-node'
 			)
@@ -41,6 +51,7 @@ class LavaPlayer(discord.Cog):
 		guild_id = event.player.guild_id
 		channel_id = event.player.fetch('channel')
 		guild = self.bot.get_guild(guild_id)
+		player: lavalink.DefaultPlayer = event.player
 
 		if not guild:
 			return await self.lavalink.player_manager.destroy(guild_id)
@@ -56,7 +67,7 @@ class LavaPlayer(discord.Cog):
 		if event.track.artwork_url:
 			embed.set_thumbnail(url=event.track.artwork_url)
 		
-		embed.description += f"\n*This track was requested by <@{event.track.requester}>*"
+		embed.description += f"\n*This track was requested by <@{event.track.requester}>*" if event.track.requester else f"\n*This is an autoplay track*"
 
 		lrclib_data = requests.get(f"https://lrclib.net/api/get?artist_name={event.track.author}&track_name={event.track.title}")
 
@@ -67,9 +78,12 @@ class LavaPlayer(discord.Cog):
 			event.track.extra["artistName"] = lrclib_data["artistName"]
 			event.track.extra["plainLyrics"] = lrclib_data["plainLyrics"] if not lrclib_data["instrumental"] else "🎼 instrumental 🎼"
 		
-		event.player.channel_status = f"Listening to {event.track.title}"
+		footerText = MusicCoreService.get_player_state(event.player)
+		embed.set_footer(text=footerText)
+
+		player.store('channel_status', f"Listening to {event.track.title}")
 		voice_channel = guild.get_channel(event.player.channel_id)
-		await voice_channel.set_status(event.player.channel_status)
+		await voice_channel.set_status(player.fetch('channel_status'))
 		
 		await channel.send(embed=embed)
 
@@ -77,12 +91,20 @@ class LavaPlayer(discord.Cog):
 	@lavalink.listener(lavalink.TrackEndEvent)
 	async def on_track_end(self, event: lavalink.TrackEndEvent):
 		guild = self.bot.get_guild(event.player.guild_id)
+		player: lavalink.DefaultPlayer = event.player
+
 		voice_channel = guild.get_channel(event.player.channel_id)
+
+		player.store('last_track_id', event.track.identifier)
 		
-		if voice_channel.status == event.player.channel_status:
+		if voice_channel.status == player.fetch('channel_status'):
 			await voice_channel.set_status(None)
 
-	
+		if not player.queue and player.fetch('autoplay'):
+			track_id: str = event.track.identifier
+			await MusicCoreService.add_autoplay_track(player, track_id)
+
+
 	@lavalink.listener(lavalink.TrackStuckEvent)
 	async def on_track_stuck(self, event: lavalink.TrackStuckEvent):
 		pass
@@ -103,7 +125,7 @@ class LavaPlayer(discord.Cog):
 		guild_id = event.player.guild_id
 		guild = self.bot.get_guild(guild_id)
 
-		if guild is not None:
+		if guild is not None and not event.player.fetch('autoplay'):
 			await guild.voice_client.disconnect(force=True)
 	
 
