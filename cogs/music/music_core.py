@@ -40,6 +40,33 @@ class MusicCore(discord.Cog):
 	@commands.check(MusicCoreService.create_player)
 	async def disconnect(self, ctx: discord.ApplicationContext):
 		await MusicCoreService.disconnect(ctx)
+	
+
+	@discord.slash_command(name="autoplay")
+	@discord.option(
+		name="set",
+		description="Set autoplay mode",
+		choices=[
+			True,
+			False
+		],
+		required=True
+	)
+	@commands.check(MusicCoreService.create_player)
+	async def autoplay(self, ctx: discord.ApplicationContext, set: bool):
+		await MusicCoreService.autoplay(ctx, set)
+	
+
+	@discord.slash_command(name="nowplaying")
+	@commands.check(MusicCoreService.create_player)
+	async def nowplaying(self, ctx: discord.ApplicationContext):
+		await MusicCoreService.nowplaying(ctx)
+	
+
+	@discord.slash_command(name="pausetoggle")
+	@commands.check(MusicCoreService.create_player)
+	async def pausetoggle(self, ctx: discord.ApplicationContext):
+		await MusicCoreService.pausetoggle(ctx)
 
 
 def setup(bot: discord.Bot):
