@@ -1,4 +1,3 @@
-import re
 import random
 import time
 from typing import Union
@@ -73,7 +72,7 @@ class MusicCoreService:
 			player.store('channel', ctx.channel.id)
 			player.store('autoplay', False)
 			player.store('history', [])
-			player.volume = 30
+			await player.set_volume(30)
 			await ctx.author.voice.channel.connect(cls=LavalinkVoiceClient)
 
 		elif voice_client.channel.id != voice_channel.id:
@@ -254,6 +253,135 @@ class MusicCoreService:
 		embed.add_field(name="Source", value=track.source_name, inline=True)
 
 		await ctx.respond(embed=embed)
+	
+
+	async def set_volume(ctx: discord.ApplicationContext, value: int):
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+
+		await player.set_volume(value)
+		await ctx.respond(f"Volume set to {value}.")
+	
+
+	async def skip_track(ctx: discord.ApplicationContext):
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+
+		if not player.is_playing:
+			return await ctx.respond("The queue is empty. Nothing to skip.")
+		
+		track: lavalink.AudioTrack = player.current
+
+		await player.skip()
+		await ctx.respond(f"Skipped `{track.title}`.")
+	
+
+	async def restart_current_track(ctx: discord.ApplicationContext):
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+
+		if not player.is_playing:
+			return await ctx.respond("No track is currently being played.", ephemeral=True)
+		
+		await player.seek(0)
+
+		if player.paused:
+			await player.set_pause(False)
+		
+		await ctx.respond(f"Restarted `{player.current.title}`.")
+	
+
+	async def seek(ctx: discord.ApplicationContext, hour: int, minute: int, second: int):
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+
+		if not player.is_playing:
+			return await ctx.respond("No track is currently being played.", ephemeral=True)
+
+		seek_position = ((((hour * 60) + minute) * 60) + second) * 1000
+
+		if seek_position > player.current.duration:
+			return await ctx.respond("Track length exceeded.", ephemeral=True)
+		
+		await player.seek(seek_position)
+
+		if player.paused:
+			await player.set_pause(False)
+
+		await ctx.respond(f"`{player.current.title}` seeked to {hour:02}:{minute:02}:{second:02}")
+	
+
+	async def rewind(ctx: discord.ApplicationContext, value: int):
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+
+		if not player.is_playing:
+			return await ctx.respond("No track is currently being played.", ephemeral=True)
+		
+		value_in_milli = value * 1000
+
+		seek_position = max(0, player.position - value_in_milli)
+
+		total_seek = (player.position - seek_position) // 1000
+
+		await player.seek(seek_position)
+
+		if player.paused:
+			await player.set_pause(False)
+
+		await ctx.respond(f"The track has been rewinded {total_seek} seconds.")
+
+
+	async def fastforward(ctx: discord.ApplicationContext, value: int):
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+
+		if not player.is_playing:
+			return await ctx.respond("No track is currently being played.", ephemeral=True)
+		
+		value_in_milli = value * 1000
+
+		seek_position = min(player.current.duration, player.position + value_in_milli)
+
+		total_seek = (seek_position - player.position) // 1000
+
+		await player.seek(seek_position)
+
+		if player.paused:
+			await player.set_pause(False)
+
+		await ctx.respond(f"The track has been fast forwarded {total_seek} seconds.")
+	
+
+	async def stop_player(ctx: discord.ApplicationContext):
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+
+		if not player.is_playing:
+			return await ctx.respond("No track is currently being played.", ephemeral=True)
+		
+		await player.stop()
+		await ctx.respond("Playback has stopped.")
+
+	
+	async def lyrics(ctx: discord.ApplicationContext):
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+
+		if not player.is_playing:
+			return await ctx.respond("No track is currently being played.", ephemeral=True)
+		
+		if "plainLyrics" in player.current.extra:
+			author = discord.EmbedAuthor(name=f"{ctx.author.nick if ctx.author.nick else ctx.author.display_name}", icon_url=ctx.author.avatar)
+			description = f"Artist: {player.current.extra["artistName"]}"
+			description += f"\nDuration: {Utils.milli_to_minutes(player.current.duration)}"
+			if "albumName" in player.current.extra:
+				description += f"\nAlbum: {player.current.extra["albumName"]}"
+			description += "\n# 📝🎶 Lyrics"
+			description += f"\n\n {player.current.extra["plainLyrics"]}"
+			embed = discord.Embed(
+				author=author,
+				description=description,
+				title=player.current.extra["trackName"],
+				url=player.current.uri,
+				thumbnail=player.current.artwork_url,
+			)
+
+			return await ctx.respond(embed=embed)
+		
+		return await ctx.respond("No lyrics found for the current track.", ephemeral=True)
 	
 
 	def get_player_state(player: lavalink.DefaultPlayer):

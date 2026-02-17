@@ -95,7 +95,8 @@ class LavaPlayer(discord.Cog):
 
 		voice_channel = guild.get_channel(event.player.channel_id)
 
-		player.store('last_track_id', event.track.identifier)
+		history: list = player.fetch('history')
+		history.insert(0, event.track)
 		
 		if voice_channel.status == player.fetch('channel_status'):
 			await voice_channel.set_status(None)
