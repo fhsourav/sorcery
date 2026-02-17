@@ -1,2 +1,1 @@
-from .utils import Utils
-from .custom_page import CustomPage
+from .utils import Utils, CustomPage

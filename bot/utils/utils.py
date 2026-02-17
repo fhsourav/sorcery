@@ -1,3 +1,7 @@
+import discord
+from discord.ext import pages
+
+
 class Utils():
 	
 	def milli_to_minutes(milli: int) -> str:
@@ -19,3 +23,16 @@ class Utils():
 		seconds = (milli // 1000) % 60
 		minutes = milli // (1000 * 60)
 		return f"{minutes:02}:{seconds:02}"
+
+
+class CustomPage():
+	"""
+	Docstring for CustomPage
+	"""
+	BUTTONS = [
+		pages.PaginatorButton("first", label="<<", style=discord.ButtonStyle.secondary),
+		pages.PaginatorButton("prev", label="<", style=discord.ButtonStyle.secondary),
+		pages.PaginatorButton("page_indicator", style=discord.ButtonStyle.primary, disabled=True),
+		pages.PaginatorButton("next", label=">", style=discord.ButtonStyle.secondary),
+		pages.PaginatorButton("last", label=">>", style=discord.ButtonStyle.secondary),
+	]

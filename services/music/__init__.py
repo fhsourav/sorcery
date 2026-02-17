@@ -1,1 +1,2 @@
 from .music_core_service import MusicCoreService
+from .music_queue_service import MusicQueueService
