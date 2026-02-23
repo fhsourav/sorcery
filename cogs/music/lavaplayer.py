@@ -2,6 +2,7 @@
 import os
 from dotenv import load_dotenv
 
+import asyncio
 import requests
 
 import discord
@@ -61,13 +62,7 @@ class LavaPlayer(discord.Cog):
 		if not channel:
 			return
 		
-		embed: discord.Embed = discord.Embed(title="Now Playing")
-		embed.description = f"**[{event.track.title}]({event.track.uri})** by `{event.track.author}`"
-
-		if event.track.artwork_url:
-			embed.set_thumbnail(url=event.track.artwork_url)
-		
-		embed.description += f"\n*This track was requested by <@{event.track.requester}>*" if event.track.requester else f"\n*This is an autoplay track*"
+		add_autoplay_track_task: asyncio.Task = asyncio.create_task(MusicCoreService.add_autoplay_track(player, event.track.identifier))
 
 		lrclib_data = requests.get(f"https://lrclib.net/api/get?artist_name={event.track.author}&track_name={event.track.title}")
 
@@ -78,6 +73,14 @@ class LavaPlayer(discord.Cog):
 			event.track.extra["artistName"] = lrclib_data["artistName"]
 			event.track.extra["plainLyrics"] = lrclib_data["plainLyrics"] if not lrclib_data["instrumental"] else "🎼 instrumental 🎼"
 		
+		embed: discord.Embed = discord.Embed(title="Now Playing")
+		embed.description = f"**[{event.track.title}]({event.track.uri})** by `{event.track.author}`"
+
+		if event.track.artwork_url:
+			embed.set_thumbnail(url=event.track.artwork_url)
+		
+		embed.description += f"\n*This track was requested by <@{event.track.requester}>*" if event.track.requester else f"\n*This is an autoplay track*"
+		
 		footerText = MusicCoreService.get_player_state(event.player)
 		embed.set_footer(text=footerText)
 
@@ -87,23 +90,25 @@ class LavaPlayer(discord.Cog):
 		
 		await channel.send(embed=embed)
 
+		await add_autoplay_track_task
+
 
 	@lavalink.listener(lavalink.TrackEndEvent)
 	async def on_track_end(self, event: lavalink.TrackEndEvent):
 		guild = self.bot.get_guild(event.player.guild_id)
 		player: lavalink.DefaultPlayer = event.player
 
+		
 		voice_channel = guild.get_channel(event.player.channel_id)
 
-		history: list = player.fetch('history')
-		history.insert(0, event.track)
-		
 		if voice_channel.status == player.fetch('channel_status'):
 			await voice_channel.set_status(None)
 
-		if not player.queue and player.fetch('autoplay'):
-			track_id: str = event.track.identifier
-			await MusicCoreService.add_autoplay_track(player, track_id)
+		if player.fetch("autoplay") and player.fetch("autoplay_track"):
+			add_autoplay_to_queue: asyncio.Task = asyncio.create_task(MusicCoreService.add_autoplay_track_to_queue(player))
+
+		history: list = player.fetch('history')
+		history.insert(0, event.track)
 
 
 	@lavalink.listener(lavalink.TrackStuckEvent)

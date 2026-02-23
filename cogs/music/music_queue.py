@@ -17,6 +17,8 @@ class MusicQueue(discord.Cog):
 	@commands.check(MusicCoreService.create_player)
 	async def queue(self, ctx: discord.ApplicationContext):
 		"""
+		Display the queue.
+
 		Docstring for queue
 		
 		:param self: Description
@@ -30,6 +32,8 @@ class MusicQueue(discord.Cog):
 	@commands.check(MusicCoreService.create_player)
 	async def history(self, ctx: discord.ApplicationContext):
 		"""
+		Display queue history.
+		
 		Docstring for history
 		
 		:param self: Description
