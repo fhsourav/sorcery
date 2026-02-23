@@ -1,3 +1,4 @@
+import aiohttp
 import asyncio
 import signal
 
@@ -19,6 +20,7 @@ class SorceryBot(discord.Bot):
 		"""
 		super().__init__(*args, **kwargs)
 		self.add_listener(self.on_shutdown)
+		self.session = None
 		
 		for signame in ("SIGINT", "SIGTERM"):
 			self.loop.add_signal_handler(
@@ -31,6 +33,8 @@ class SorceryBot(discord.Bot):
 		"""
 		Event hadler that is triggered when the bot is ready.
 		"""
+		if self.session is None:
+			self.session = aiohttp.ClientSession()
 		print(f"Logged in as {self.user} (ID: {self.user.id})")
 		print("----------")
 	
@@ -44,6 +48,8 @@ class SorceryBot(discord.Bot):
 		"""
 		self.dispatch("shutdown") # triggers `on_shutdown`
 		await asyncio.sleep(2) # sleep to let `on_shutdown` to complete
+		if self.session:
+			await self.session.close()
 		print("shutting down gracefully.")
 		print("----------")
 		return await super().close()

@@ -2,8 +2,8 @@
 import os
 from dotenv import load_dotenv
 
+import aiohttp
 import asyncio
-import requests
 
 import discord
 import lavalink
@@ -63,15 +63,6 @@ class LavaPlayer(discord.Cog):
 			return
 		
 		add_autoplay_track_task: asyncio.Task = asyncio.create_task(MusicCoreService.add_autoplay_track(player, event.track.identifier))
-
-		lrclib_data = requests.get(f"https://lrclib.net/api/get?artist_name={event.track.author}&track_name={event.track.title}")
-
-		if lrclib_data.status_code == 200:
-			lrclib_data = lrclib_data.json() # contains id, trackName, artistName, albumName, duration, instrumental, plainLyrics and syncedLyrics.
-			event.track.extra["albumName"] = lrclib_data["albumName"]
-			event.track.extra["trackName"] = lrclib_data["trackName"]
-			event.track.extra["artistName"] = lrclib_data["artistName"]
-			event.track.extra["plainLyrics"] = lrclib_data["plainLyrics"] if not lrclib_data["instrumental"] else "🎼 instrumental 🎼"
 		
 		embed: discord.Embed = discord.Embed(title="Now Playing")
 		embed.description = f"**[{event.track.title}]({event.track.uri})** by `{event.track.author}`"
@@ -90,7 +81,24 @@ class LavaPlayer(discord.Cog):
 		
 		await channel.send(embed=embed)
 
-		await add_autoplay_track_task
+		try:
+			async with self.bot.session.get(f"https://lrclib.net/api/get?artist_name={event.track.author}&track_name={event.track.title}") as response:
+				
+				if response.status == 200:
+					lrclib_data = await response.json()
+					event.track.extra["albumName"] = lrclib_data["albumName"]
+					event.track.extra["trackName"] = lrclib_data["trackName"]
+					event.track.extra["artistName"] = lrclib_data["artistName"]
+					event.track.extra["plainLyrics"] = lrclib_data["plainLyrics"] if not lrclib_data["instrumental"] else "🎼 instrumental 🎼"
+		
+		except aiohttp.ClientConnectionError as e:
+			print(f"Connection Error: Check if your internet of if the site is down.\n{e}")
+		except aiohttp.ClientSSLError as e:
+			print(f"SSL/Certificate Error:\n{e}")
+		except asyncio.TimeoutError:
+			print(f"The api took too long to respond.\n{e}")
+		except Exception as e:
+			print(f"Lyrics could not be retrieved\n{e}")
 
 
 	@lavalink.listener(lavalink.TrackEndEvent)

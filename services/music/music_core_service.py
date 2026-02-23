@@ -1,3 +1,4 @@
+import aiohttp
 import asyncio
 import random
 import time
@@ -262,7 +263,7 @@ class MusicCoreService:
 			embed.add_field(name="Added", value=f"<t:{track.extra['added_at']}:f>", inline=True)
 			embed.add_field(name="Requested by", value=f"<@{track.requester}>", inline=True)
 		
-		if track.extra["albumName"]:
+		if "albumName" in track.extra.keys():
 			album = track.extra["albumName"]
 			embed.add_field(name="Album", value=album, inline=True)
 
@@ -284,10 +285,12 @@ class MusicCoreService:
 		if not player.is_playing:
 			return await ctx.respond("The queue is empty. Nothing to skip.")
 		
-		track: lavalink.AudioTrack = player.current
+		track_title = player.current.title
+
+		print(track_title)
 
 		await player.skip()
-		await ctx.respond(f"Skipped `{track.title}`.")
+		await ctx.respond(f"Skipped `{track_title}`.")
 	
 
 	async def restart_current_track(ctx: discord.ApplicationContext):
