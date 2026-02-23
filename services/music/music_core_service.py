@@ -1,3 +1,4 @@
+import asyncio
 import random
 import time
 from typing import Union
@@ -71,6 +72,7 @@ class MusicCoreService:
 				
 			player.store('channel', ctx.channel.id)
 			player.store('autoplay', False)
+			player.store('autoplay_track', None)
 			player.store('history', [])
 			await player.set_volume(30)
 			await ctx.author.voice.channel.connect(cls=LavalinkVoiceClient)
@@ -200,25 +202,39 @@ class MusicCoreService:
 
 		player.store('autoplay', set)
 
+		if player.is_playing:
+			await MusicCoreService.add_autoplay_track(player, player.current.identifier)
+
 		await ctx.respond(f"Autoplay has been {'disabled' if set == 0 else 'enabled'}.")
 	
 
-	async def add_autoplay_track(player: lavalink.DefaultPlayer, last_track_id: str):
-		search_query = f"https://music.youtube.com/watch?v={last_track_id}&list=RDAMVM{last_track_id}"
+	async def add_autoplay_track(player: lavalink.DefaultPlayer, track_id: str):
+		if not player.fetch("autoplay"):
+			return
+
+		search_query = f"https://music.youtube.com/watch?v={track_id}&list=RDAMVM{track_id}"
 		search_result: lavalink.LoadResult = await player.node.get_tracks(search_query)
 
-		min = 0
-		max = len(search_result.tracks)
+		min_val = 0
+		max_val = min(4, len(search_result.tracks))
 		
-		idx = random.randint(min, max)
-		while search_result.tracks[idx].identifier == last_track_id:
-			idx = random.randint(min, max)
+		idx = random.randint(min_val, max_val)
+		while search_result.tracks[idx].identifier == track_id:
+			idx = random.randint(min_val, max_val)
 		
 		track = search_result.tracks[idx]
-		player.add(track=track)
-		
-		if not player.is_playing:
-			await player.play()
+
+		player.store("autoplay_track", track)
+	
+
+	async def add_autoplay_track_to_queue(player: lavalink.DefaultPlayer):
+		autoplay_track = player.fetch("autoplay_track")
+		if autoplay_track:
+			player.add(autoplay_track)
+			player.store("autoplay_track", None)
+			await asyncio.sleep(1)
+			if not player.is_playing:
+				await player.play()
 	
 
 	async def nowplaying(ctx: discord.ApplicationContext):
@@ -395,7 +411,7 @@ class MusicCoreService:
 			return
 		
 		player_state = f"{'🔁' if player.loop == player.LOOP_QUEUE else '🔂' if player.loop == player.LOOP_SINGLE else '🚫'} Loop: {'all' if player.loop == player.LOOP_QUEUE else 'one' if player.loop == player.LOOP_SINGLE else 'off'}\t\t"
-		player_state += f"{'🚨' if player.volume > 100 else '🔊' if player.volume > 67 else '🔉' if player.volume > 33 else '🔈' if player.volume > 0 else '🔇'} Volume: {player.volume}\t\t\t"
+		player_state += f"{'🚨' if player.volume > 100 else '🔊' if player.volume > 67 else '🔉' if player.volume > 33 else '🔈' if player.volume > 0 else '🔇'} Volume: {player.volume}\t\t"
 		player_state += f"{'♾️' if player.fetch('autoplay') else '❎'} Autoplay: {'on' if player.fetch('autoplay') else 'off'}"
 
 		return player_state

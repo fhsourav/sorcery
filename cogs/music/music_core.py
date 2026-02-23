@@ -30,6 +30,9 @@ class MusicCore(discord.Cog):
 	)
 	@commands.check(MusicCoreService.create_player)
 	async def play(self, ctx: discord.ApplicationContext, source: str, query: str):
+		"""
+		Play a track with the given query.
+		"""
 		if query in self.search_results[ctx.author.id]:
 			await MusicCoreService.play(ctx, self.search_results[ctx.author.id][query])
 		else:
@@ -40,13 +43,16 @@ class MusicCore(discord.Cog):
 	@discord.slash_command(name="stop") # previously disconnect
 	@commands.check(MusicCoreService.create_player)
 	async def stop(self, ctx: discord.ApplicationContext):
+		"""
+		Stop the player and disconnect.
+		"""
 		await MusicCoreService.disconnect(ctx)
 	
 
 	@discord.slash_command(name="autoplay")
 	@discord.option(
-		name="set",
-		description="Set autoplay mode",
+		name="mode",
+		description="If set to True, player will keep playing recommended tracks.",
 		choices=[
 			True,
 			False
@@ -55,18 +61,27 @@ class MusicCore(discord.Cog):
 	)
 	@commands.check(MusicCoreService.create_player)
 	async def autoplay(self, ctx: discord.ApplicationContext, set: bool):
+		"""
+		Set the autoplay mode.
+		"""
 		await MusicCoreService.autoplay(ctx, set)
 	
 
 	@discord.slash_command(name="nowplaying")
 	@commands.check(MusicCoreService.create_player)
 	async def nowplaying(self, ctx: discord.ApplicationContext):
+		"""
+		Display information about the current track.
+		"""
 		await MusicCoreService.nowplaying(ctx)
 	
 
 	@discord.slash_command(name="pausetoggle")
 	@commands.check(MusicCoreService.create_player)
 	async def pausetoggle(self, ctx: discord.ApplicationContext):
+		"""
+		Pause/resume playback.		
+		"""
 		await MusicCoreService.pausetoggle(ctx)
 
 
@@ -80,6 +95,8 @@ class MusicCore(discord.Cog):
 	@commands.check(MusicCoreService.create_player)
 	async def volume(self, ctx: discord.ApplicationContext, value: int):
 		"""
+		Adjust the volume of the player (clipping may occur when the value exceeds 100).
+
 		Docstring for volume
 		
 		:param self: Description
@@ -95,6 +112,8 @@ class MusicCore(discord.Cog):
 	@commands.check(MusicCoreService.create_player)
 	async def skip(self, ctx: discord.ApplicationContext):
 		"""
+		Skip the current track.
+
 		Docstring for skip
 		
 		:param self: Description
@@ -108,6 +127,8 @@ class MusicCore(discord.Cog):
 	@commands.check(MusicCoreService.create_player)
 	async def restart(self, ctx: discord.ApplicationContext):
 		"""
+		Restart the current track.
+
 		Docstring for restart
 		
 		:param self: Description
@@ -136,6 +157,8 @@ class MusicCore(discord.Cog):
 	@commands.check(MusicCoreService.create_player)
 	async def seek(self, ctx: discord.ApplicationContext, hour: int, minute: int, second: int):
 		"""
+		Seek to a specific position in the current track.
+
 		Docstring for seek
 		
 		:param self: Description
@@ -160,6 +183,8 @@ class MusicCore(discord.Cog):
 	@commands.check(MusicCoreService.create_player)
 	async def rewind(self, ctx: discord.ApplicationContext, value: int = 10):
 		"""
+		Rewind the current track (defaults to 10 seconds).
+
 		Docstring for rewind
 		
 		:param self: Description
@@ -180,6 +205,8 @@ class MusicCore(discord.Cog):
 	@commands.check(MusicCoreService.create_player)
 	async def fastforward(self, ctx: discord.ApplicationContext, value: int = 10):
 		"""
+		Fast-forward the current track (defaults to 10 seconds).
+
 		Docstring for fastforward
 		
 		:param self: Description
@@ -208,6 +235,8 @@ class MusicCore(discord.Cog):
 	@commands.check(MusicCoreService.create_player)
 	async def lyrics(self, ctx: discord.ApplicationContext):
 		"""
+		Display lyrics of the current track.
+
 		Docstring for lyrics
 		
 		:param self: Description
