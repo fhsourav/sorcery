@@ -217,10 +217,14 @@ class MusicCoreService:
 		search_result: lavalink.LoadResult = await player.node.get_tracks(search_query)
 
 		min_val = 0
-		max_val = min(4, len(search_result.tracks))
+		max_val = len(search_result.tracks)
+
+		identifiers = [history_track.identifier for history_track in player.fetch("history")]
 		
 		idx = random.randint(min_val, max_val)
-		while search_result.tracks[idx].identifier == track_id:
+		while True:
+			if search_result.tracks[idx].identifier not in identifiers:
+				break
 			idx = random.randint(min_val, max_val)
 		
 		track = search_result.tracks[idx]
@@ -286,8 +290,6 @@ class MusicCoreService:
 			return await ctx.respond("The queue is empty. Nothing to skip.")
 		
 		track_title = player.current.title
-
-		print(track_title)
 
 		await player.skip()
 		await ctx.respond(f"Skipped `{track_title}`.")

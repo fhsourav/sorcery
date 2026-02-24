@@ -62,6 +62,9 @@ class LavaPlayer(discord.Cog):
 		if not channel:
 			return
 		
+		history: list = player.fetch("history")
+		history.insert(0, event.track)
+
 		add_autoplay_track_task: asyncio.Task = asyncio.create_task(MusicCoreService.add_autoplay_track(player, event.track.identifier))
 		
 		embed: discord.Embed = discord.Embed(title="Now Playing")
@@ -92,11 +95,11 @@ class LavaPlayer(discord.Cog):
 					event.track.extra["plainLyrics"] = lrclib_data["plainLyrics"] if not lrclib_data["instrumental"] else "🎼 instrumental 🎼"
 		
 		except aiohttp.ClientConnectionError as e:
-			print(f"Connection Error: Check if your internet of if the site is down.\n{e}")
+			print(f"Connection Error: Check if your internet or the site is down.\n{e}")
 		except aiohttp.ClientSSLError as e:
 			print(f"SSL/Certificate Error:\n{e}")
 		except asyncio.TimeoutError:
-			print(f"The api took too long to respond.\n{e}")
+			print(f"The API took too long to respond.\n{e}")
 		except Exception as e:
 			print(f"Lyrics could not be retrieved\n{e}")
 
@@ -112,11 +115,8 @@ class LavaPlayer(discord.Cog):
 		if voice_channel.status == player.fetch('channel_status'):
 			await voice_channel.set_status(None)
 
-		if player.fetch("autoplay") and player.fetch("autoplay_track"):
+		if player.fetch("autoplay") and not player.queue and not player.is_playing:
 			add_autoplay_to_queue: asyncio.Task = asyncio.create_task(MusicCoreService.add_autoplay_track_to_queue(player))
-
-		history: list = player.fetch('history')
-		history.insert(0, event.track)
 
 
 	@lavalink.listener(lavalink.TrackStuckEvent)

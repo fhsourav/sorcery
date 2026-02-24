@@ -26,7 +26,7 @@ class MusicQueueService:
 	async def display_history(ctx: discord.ApplicationContext):
 		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
 
-		history: list[lavalink.AudioTrack] = player.fetch('history')
+		history: list[lavalink.AudioTrack] = player.fetch('history')[1:]
 
 		paginator: pages.Paginator = MusicQueueService.get_queue_paginator(ctx, history, 1)
 
