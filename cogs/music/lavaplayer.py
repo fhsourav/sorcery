@@ -27,6 +27,100 @@ class LavaPlayer(discord.Cog):
 		self.lavalink._event_hooks.clear()
 	
 
+	async def empty_channel_timeout(self, player: lavalink.DefaultPlayer, msg: str):
+		"""
+		"""
+		guild = self.bot.get_guild(player.guild_id)
+		text_channel = guild.get_channel(player.fetch('channel'))
+		voice_channel = guild.get_channel(player.channel_id)
+		try:
+			await text_channel.send(f"{msg} Leaving after a timeout of 2 minutes.")
+			await asyncio.sleep(120)
+			await MusicCoreService.disconnect_chores(self.bot, player)
+			await guild.voice_client.disconnect(force=True)
+			await text_channel.send(f"{self.bot.user.name} has gracefully left the stage. See you next time.")
+		except asyncio.CancelledError:
+			pass # if cancelled, do nothing (maybe do something someday, but for now, nothing comes to mind.)
+	
+
+	async def inactive_player_timeout(self, player: lavalink.DefaultPlayer):
+		"""
+		"""
+		guild = self.bot.get_guild(player.guild_id)
+		text_channel = guild.get_channel(player.fetch('channel'))
+		try:
+			await text_channel.send(f"Player is idle. Leaving after a timeout of 2 minutes.")
+			await asyncio.sleep(120)
+			await MusicCoreService.disconnect_chores(self.bot, player)
+			await guild.voice_client.disconnect(force=True)
+			await text_channel.send(f"{self.bot.user.name} has gracefully left the stage. See you next time.")
+		except asyncio.CancelledError:
+			pass
+
+	
+
+	@discord.Cog.listener()
+	async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+		"""
+		"""
+		# this event is currently being used to check if there are any users in the voice channel
+		# that the player is connected to.
+		# if there are no users in the voice channel, we start a 2 minute countdown
+		# and if no user joins within 2 minutes, the player disconnects
+
+		# if the member is a bot, do nothing
+		if member.bot:
+			return
+		
+		# return if both before and after have the same channel (meaning no user left or joined a voice channel)
+		if before.channel == after.channel:
+			return
+		
+		player: lavalink.DefaultPlayer = self.bot.lavalink.player_manager.get(member.guild.id)
+		if not player: # if voice client is not connected
+			# TODO
+			return
+		
+		if player.fetch("inactive_player_timeout_task"):
+			return
+		
+		guild = self.bot.get_guild(player.guild_id)
+		text_channel = guild.get_channel(player.fetch('channel'))
+		player_channel = guild.get_channel(player.channel_id)
+
+		if not player_channel:
+			return
+		
+		if before.channel == player_channel: # member has left the channel
+			if not False in [member.bot for member in player_channel.members]: # if the channel is inactive (if all members are bots)
+				msg = "" # the message to send
+				if player.is_playing and not player.paused: # if the player is in the middle of playing a track
+					await player.set_pause(True) # pause the player
+					msg += "Playback paused." # notify in a message
+				if len(player_channel.members) > 1: # if there are other bots in the channel
+					msg += f" The bots are now conspiring to take over <#{player.channel_id}>."
+				else: # if the bot is alone in the channel
+					msg += f" {self.bot.user.name} is alone in <#{player.channel_id}>."
+
+				empty_channel_timeout_task = asyncio.create_task(self.empty_channel_timeout(player, msg))
+				player.store("empty_channel_timeout_task", empty_channel_timeout_task)
+		
+		elif after.channel == player_channel: # member has joined the channel
+			empty_channel_timeout_task: asyncio.Task = player.fetch("empty_channel_timeout_task")
+			if not empty_channel_timeout_task:
+				return
+			
+			if not empty_channel_timeout_task.done(): # if a member joins the channel before timeout is done
+				msg = ""
+				empty_channel_timeout_task.cancel() # cancel the task
+				if player.is_playing: # if player was playing
+					await player.set_pause(False) # resume it
+					msg += "Playback resumed."
+				
+				await text_channel.send(f"Timeout cancelled. {msg}") # notify in a message
+			player.store("empty_channel_timeout_task", None) 
+		
+
 	@discord.Cog.listener()
 	async def on_ready(self):
 		if not hasattr(self.bot, 'lavalink'):
@@ -116,7 +210,7 @@ class LavaPlayer(discord.Cog):
 			await voice_channel.set_status(None)
 
 		if player.fetch("autoplay") and not player.queue and not player.is_playing:
-			add_autoplay_to_queue: asyncio.Task = asyncio.create_task(MusicCoreService.add_autoplay_track_to_queue(player))
+			asyncio.create_task(MusicCoreService.add_autoplay_track_to_queue(player))
 
 
 	@lavalink.listener(lavalink.TrackStuckEvent)
@@ -138,9 +232,11 @@ class LavaPlayer(discord.Cog):
 	async def on_queue_end(self, event: lavalink.QueueEndEvent):
 		guild_id = event.player.guild_id
 		guild = self.bot.get_guild(guild_id)
+		player: lavalink.DefaultPlayer = event.player
 
-		if guild is not None and not event.player.fetch('autoplay'):
-			await guild.voice_client.disconnect(force=True)
+		if guild is not None and not player.fetch('autoplay'):
+			inactive_player_timeout_task = asyncio.create_task(self.inactive_player_timeout(event.player))
+			player.store("inactive_player_timeout_task", inactive_player_timeout_task)
 	
 
 	@lavalink.listener(lavalink.PlayerUpdateEvent)

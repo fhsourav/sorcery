@@ -75,13 +75,20 @@ class MusicCoreService:
 			player.store('autoplay', False)
 			player.store('autoplay_track', None)
 			player.store('history', [])
+			player.store("empty_channel_timeout_task", None)
+			player.store("inactive_player_timeout_task", None)
 			await player.set_volume(30)
 			await ctx.author.voice.channel.connect(cls=LavalinkVoiceClient)
 
-		elif voice_client.channel.id != voice_channel.id:
-			message = f'Please join {voice_client.channel} to use this command'
-			await ctx.respond(message, ephemeral=True)
-			raise discord.errors.ApplicationCommandInvokeError(message)
+		else:
+			if voice_client.channel.id != voice_channel.id:
+				message = f'Please join {voice_client.channel} to use this command'
+				await ctx.respond(message, ephemeral=True)
+				raise discord.errors.ApplicationCommandInvokeError(message)
+			elif ctx.channel_id != player.fetch('channel'):
+				message = f"Please use <#{player.fetch('channel')}> to interact with the player."
+				await ctx.respond(message, ephemeral=True)
+				raise discord.ApplicationCommandInvokeError(message)
 		
 		return True
 	
@@ -133,6 +140,12 @@ class MusicCoreService:
 
 		added_at = int(time.time())
 
+		inactive_player_timeout_task: asyncio.Task = player.fetch("inactive_player_timeout_task")
+		if inactive_player_timeout_task and not inactive_player_timeout_task.done():
+			inactive_player_timeout_task.cancel()
+			await ctx.respond("Timeout cancelled.")
+		player.store("inactive_player_timeout_task", None)
+
 		if isinstance(chosenResult, lavalink.LoadResult): # check if the chosenResult is a playlist
 			tracks = chosenResult.tracks
 			# Add all of the tracks from the playlist to the queue
@@ -165,9 +178,22 @@ class MusicCoreService:
 		await player.set_pause(not player.paused)
 
 		await ctx.respond(f"Playback {'paused' if player.paused else 'resumed'}.")
+
+
+	async def disconnect_chores(bot: discord.Bot, player: lavalink.DefaultPlayer):
+		guild = bot.get_guild(player.guild_id)
+		voice_channel = guild.get_channel(player.channel_id)
+
+		if voice_channel.status == player.fetch('channel_status'):
+			await voice_channel.set_status(None)
+
+		# Clear the queue to ensure old tracks don't start playing when someone else queues something
+		player.queue.clear()
+		# Stop the current track so Lavalink consumes less resource
+		await player.stop()
 	
 
-	async def disconnect(ctx: discord.ApplicationContext):
+	async def disconnect(ctx: discord.ApplicationContext, search_results: dict):
 		"""
 		Docstring for disconnect
 		
@@ -178,9 +204,7 @@ class MusicCoreService:
 		# We don't need to duplicate code checking them again
 
 		# Clear the queue to ensure old tracks don't start playing when someone else queues something
-		player.queue.clear()
-		# Stop the current track so Lavalink consumes less resource
-		await player.stop()
+		MusicCoreService.disconnect_chores(ctx.bot, player)
 		# Disconnect from the voice channel
 		await ctx.voice_client.disconnect(force=True)
 		await ctx.respond(f"{ctx.bot.user.name} has gracefully left the stage. See you next time!")
@@ -197,14 +221,12 @@ class MusicCoreService:
 		"""
 		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild_id)
 		
-		if not player.current and not player.queue:
-			await ctx.voice_client.disconnect(force=True)
-			return await ctx.respond("Player is idle.")
+		if not player.is_playing:
+			return await ctx.respond("Player is idle.", ephemeral=True)
 
 		player.store('autoplay', set)
 
-		if player.is_playing:
-			await MusicCoreService.add_autoplay_track(player, player.current.identifier)
+		await MusicCoreService.add_autoplay_track(player, player.current.identifier)
 
 		await ctx.respond(f"Autoplay has been {'disabled' if set == 0 else 'enabled'}.")
 	
@@ -217,7 +239,7 @@ class MusicCoreService:
 		search_result: lavalink.LoadResult = await player.node.get_tracks(search_query)
 
 		min_val = 0
-		max_val = len(search_result.tracks)
+		max_val = len(search_result.tracks) - 1
 
 		identifiers = [history_track.identifier for history_track in player.fetch("history")]
 		

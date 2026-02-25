@@ -45,7 +45,7 @@ class MusicCore(discord.Cog):
 		"""
 		Stop the player and disconnect.
 		"""
-		await MusicCoreService.disconnect(ctx)
+		await MusicCoreService.disconnect(ctx, self.search_results)
 	
 
 	@discord.slash_command(name="autoplay")
