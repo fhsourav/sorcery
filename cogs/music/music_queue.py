@@ -41,6 +41,89 @@ class MusicQueue(discord.Cog):
 		:type ctx: discord.ApplicationContext
 		"""
 		await MusicQueueService.display_history(ctx)
+	
+
+	@discord.slash_command(name="delete")
+	@discord.option(
+		name="track",
+		description="Choose from queue.",
+		autocomplete=MusicQueueService.queue_autocomplete
+	)
+	@commands.check(MusicCoreService.create_player)
+	async def delete(self, ctx: discord.ApplicationContext, track: int):
+		"""
+		Delete a track from the queue.
+		"""
+		await MusicQueueService.delete(ctx, track)
+	
+
+	@discord.slash_command(name="loop")
+	@discord.option(
+		name="mode",
+		description="Choose a mode.",
+		choices=[
+			discord.OptionChoice(name="off", value=0),
+			discord.OptionChoice(name="current track", value=1),
+			discord.OptionChoice(name="all (loops through the current queue, previous tracks are ignored)", value=2)
+		]
+	)
+	@commands.check(MusicCoreService.create_player)
+	async def loop(self, ctx: discord.ApplicationContext, mode: int):
+		"""
+		Adjust the loop mode.
+		"""
+		await MusicQueueService.set_loop(ctx, mode)
+	
+
+	@discord.slash_command(name="shuffle")
+	@discord.option(
+		name="set",
+		description="Set shuffle mode.",
+		choices=[
+			True,
+			False
+		]
+	)
+	@commands.check(MusicCoreService.create_player)
+	async def shuffle(self, ctx: discord.ApplicationContext, set: bool):
+		"""
+		Shuffle the queue.
+		"""
+		await MusicQueueService.shuffle(ctx, set)
+	
+
+	@discord.slash_command(name="skipto")
+	@discord.option(
+		name="track",
+		description="Choose from queue.",
+		autocomplete=MusicQueueService.queue_autocomplete
+	)
+	@commands.check(MusicCoreService.create_player)
+	async def skipto(self, ctx: discord.ApplicationContext, track: int):
+		"""
+		Skip to another song from the queue. Tracks in between are discarded.
+		"""
+		await MusicQueueService.skipto(ctx, track)
+	
+
+	reset = discord.SlashCommandGroup(name="reset")
+
+	@reset.command(name="queue")
+	@commands.check(MusicCoreService.create_player)
+	async def reset_queue(self, ctx: discord.ApplicationContext):
+		"""
+		Reset the queue.
+		"""
+		await MusicQueueService.clear_queue(ctx)
+	
+
+	@reset.command(name="history")
+	@commands.check(MusicCoreService.create_player)
+	async def reset_history(self, ctx: discord.ApplicationContext):
+		"""
+		Reset the history.
+		"""
+		await MusicQueueService.clear_history(ctx)
 		
 
 

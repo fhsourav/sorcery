@@ -215,19 +215,6 @@ class MusicCore(discord.Cog):
 		:type value: int
 		"""
 		await MusicCoreService.fastforward(ctx, value)
-	
-
-	# @discord.slash_command(name="stop")
-	# @commands.check(MusicCoreService.create_player)
-	# async def stop(self, ctx: discord.ApplicationContext):
-	# 	"""
-	# 	Docstring for stop
-		
-	# 	:param self: Description
-	# 	:param ctx: Description
-	# 	:type ctx: discord.ApplicationContext
-	# 	"""
-	# 	await MusicCoreService.stop_player(ctx)
 
 	
 	@discord.slash_command(name="lyrics")
@@ -243,6 +230,20 @@ class MusicCore(discord.Cog):
 		:type ctx: discord.ApplicationContext
 		"""
 		await MusicCoreService.lyrics(ctx)
+	
+
+	@discord.slash_command(name="replay")
+	@discord.option(
+		name="track",
+		description="Choose from history.",
+		autocomplete=MusicCoreService.autocomplete_history
+	)
+	@commands.check(MusicCoreService.create_player)
+	async def replay(self, ctx: discord.ApplicationContext, track: int):
+		"""
+		Play a song from the playback history. Current track is skipped.
+		"""
+		await MusicCoreService.replay(ctx, track)
 
 
 def setup(bot: discord.Bot):

@@ -75,6 +75,9 @@ class LavaPlayer(discord.Cog):
 		# return if both before and after have the same channel (meaning no user left or joined a voice channel)
 		if before.channel == after.channel:
 			return
+
+		if not hasattr(self.bot, "lavalink"):
+			return
 		
 		player: lavalink.DefaultPlayer = self.bot.lavalink.player_manager.get(member.guild.id)
 		if not player: # if voice client is not connected
@@ -177,6 +180,9 @@ class LavaPlayer(discord.Cog):
 		await voice_channel.set_status(player.fetch('channel_status'))
 		
 		await channel.send(embed=embed)
+
+		if "plainLyrics" in event.track.extra.keys():
+			return
 
 		try:
 			async with self.bot.session.get(f"https://lrclib.net/api/get?artist_name={event.track.author}&track_name={event.track.title}") as response:

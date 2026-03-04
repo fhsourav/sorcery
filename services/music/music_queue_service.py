@@ -1,5 +1,3 @@
-from typing import Union
-
 import discord
 import lavalink
 
@@ -131,3 +129,78 @@ class MusicQueueService:
 		)
 
 		return paginator
+	
+
+	async def queue_autocomplete(self, ctx: discord.AutocompleteContext):
+		if not hasattr(self.bot, 'lavalink'):
+			return [
+				discord.OptionChoice(
+					name="Player has not been initiated.",
+					value=-1,
+				)
+			]
+		player: lavalink.DefaultPlayer = self.bot.lavalink.player_manager.get(ctx.interaction.guild.id)
+		if not player.queue:
+			return [
+				discord.OptionChoice(
+					name="Queue is empty.",
+					value=-2,
+				)
+			]
+		return [
+			discord.OptionChoice(
+				name=f"[{Utils.milli_to_minutes(track.duration)}] {track.title[:50]} by {track.author[:20]} ({track.source_name})",
+				value=idx
+			) for idx, track in enumerate(player.queue)
+		]
+	
+
+	async def delete(ctx: discord.ApplicationContext, track_idx: int):
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+		track = player.queue.pop(track_idx)
+		await ctx.respond(f"`{track.title}` has been deleted from queue.")
+	
+
+	async def set_loop(ctx: discord.ApplicationContext, mode: int):
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+		player.set_loop(mode)
+		await ctx.respond(f"Player loop is set to `{'off' if mode == 0 else 'current track' if mode == 1 else 'all'}`.")
+
+
+	async def shuffle(ctx: discord.ApplicationContext, set: bool):
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+		player.set_shuffle(set)
+		await ctx.respond(f"Player shuffle is `{'enabled' if set else 'disabled'}`.")
+	
+
+	async def skipto(ctx: discord.ApplicationContext, track_idx: int):
+		if track_idx == -1:
+			return await ctx.respond("Player has not been initiated.", ephemeral=True)
+		if track_idx == -2:
+			return await ctx.respond("Player queue is empty.", ephemeral=True)
+		
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+
+		if track_idx > len(player.queue):
+			return await ctx.respond("Invalid track.", ephemeral=True)
+		
+		for i in range(track_idx):
+			player.queue.pop(0)
+		
+		track_title: str = player.queue[0].title
+
+		await player.skip()
+
+		await ctx.respond(f"Skipped to `{track_title}`.")
+
+	
+	async def clear_queue(ctx: discord.ApplicationContext):
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+		player.queue.clear()
+		await ctx.respond("Player queue has been cleared.")
+
+	
+	async def clear_history(ctx: discord.ApplicationContext):
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+		player.fetch("history").clear()
+		await ctx.respond("Player history has been cleared.")

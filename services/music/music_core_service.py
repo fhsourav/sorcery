@@ -1,4 +1,3 @@
-import aiohttp
 import asyncio
 import random
 import time
@@ -126,6 +125,31 @@ class MusicCoreService:
 		]
 	
 
+	async def autocomplete_history(self, ctx: discord.AutocompleteContext):
+		if not hasattr(self.bot, 'lavalink'):
+			return [
+				discord.OptionChoice(
+					name="Player has not been initiated.",
+					value=-1,
+				)
+			]
+		player: lavalink.DefaultPlayer = self.bot.lavalink.player_manager.get(ctx.interaction.guild.id)
+		history: list[lavalink.AudioTrack] = player.fetch('history')[1:]
+		if not history:
+			return [
+				discord.OptionChoice(
+					name="History is empty.",
+					value=-2,
+				)
+			]
+		return [
+			discord.OptionChoice(
+				name=f"[{Utils.milli_to_minutes(track.duration)}] {track.title[:50]} by {track.author[:20]} ({track.source_name})",
+				value=idx + 1
+			) for idx, track in enumerate(history)
+		]
+	
+
 	async def play(ctx: discord.ApplicationContext, chosenResult: Union[lavalink.AudioTrack, lavalink.DeferredAudioTrack, lavalink.LoadResult]):
 		"""
 		Docstring for play
@@ -169,6 +193,29 @@ class MusicCoreService:
 			await player.play()
 	
 
+	async def replay(ctx: discord.ApplicationContext, track_idx: int): # used primarily for playing a track from history
+		if track_idx == -1:
+			return await ctx.respond("Player has not been initiated.", ephemeral=True)
+		if track_idx == -2:
+			return await ctx.respond("Player history is empty.", ephemeral=True)
+
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+		added_at = int(time.time())
+
+		track = player.fetch('history')[track_idx]
+
+		if track:
+			track.extra['added_at'] = added_at
+			player.add(track, requester=ctx.author.id, index=0)
+
+			await ctx.respond(f"Added **`{track.title} ({track.source_name})`** to the queue.")
+
+			if not player.is_playing:
+				await player.play()
+			else:
+				await player.skip()
+	
+
 	async def pausetoggle(ctx: discord.ApplicationContext):
 		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
 
@@ -204,7 +251,7 @@ class MusicCoreService:
 		# We don't need to duplicate code checking them again
 
 		# Clear the queue to ensure old tracks don't start playing when someone else queues something
-		MusicCoreService.disconnect_chores(ctx.bot, player)
+		await MusicCoreService.disconnect_chores(ctx.bot, player)
 		# Disconnect from the voice channel
 		await ctx.voice_client.disconnect(force=True)
 		await ctx.respond(f"{ctx.bot.user.name} has gracefully left the stage. See you next time!")
@@ -228,7 +275,7 @@ class MusicCoreService:
 
 		await MusicCoreService.add_autoplay_track(player, player.current.identifier)
 
-		await ctx.respond(f"Autoplay has been {'disabled' if set == 0 else 'enabled'}.")
+		await ctx.respond(f"Autoplay has been {'enable' if set else 'disabled'}.")
 	
 
 	async def add_autoplay_track(player: lavalink.DefaultPlayer, track_id: str):
@@ -313,7 +360,16 @@ class MusicCoreService:
 		
 		track_title = player.current.title
 
+		is_loop_one = player.loop == player.LOOP_SINGLE
+
+		if is_loop_one:
+			player.set_loop(0)
+		
 		await player.skip()
+
+		if is_loop_one:
+			player.set_loop(1)
+
 		await ctx.respond(f"Skipped `{track_title}`.")
 	
 
