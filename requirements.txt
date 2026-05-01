@@ -1,4 +1,4 @@
 py-cord[voice,speed]
 lavalink
 python-dotenv
-requests
+ytmusicapi

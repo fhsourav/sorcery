@@ -185,7 +185,7 @@ class LavaPlayer(discord.Cog):
 			return
 
 		try:
-			async with self.bot.session.get(f"https://lrclib.net/api/get?artist_name={event.track.author}&track_name={event.track.title}") as response:
+			async with self.bot.session.get(f"https://lrclib.net/api/get?artist_name={event.track.author.removesuffix(" - Topic")}&track_name={event.track.title}") as response:
 				
 				if response.status == 200:
 					lrclib_data = await response.json()

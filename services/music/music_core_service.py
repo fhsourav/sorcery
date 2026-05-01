@@ -5,6 +5,7 @@ from typing import Union
 
 import discord
 import lavalink
+import ytmusicapi
 
 from discord.ext import commands
 
@@ -281,23 +282,80 @@ class MusicCoreService:
 	async def add_autoplay_track(player: lavalink.DefaultPlayer, track_id: str):
 		if not player.fetch("autoplay"):
 			return
+		
+		history = [history_track.identifier for history_track in player.fetch("history")]
+		history_set = set(history)
+		recent_set = set(history[:30])
+		
+		seed_candidates = [track_id]
+		seed_candidates += random.sample(history[1:], min(3, len(history) - 1))
 
+		track = None
+
+		# first pass (using ytmusicapi)
+		ytmusic = ytmusicapi.YTMusic()
+
+		for seed in seed_candidates:
+			try:
+				watch = ytmusic.get_watch_playlist(seed, limit=20, radio=True)
+			except Exception:
+				watch = None
+			
+			if not watch:
+				continue
+			
+			ytm_tracks = watch.get("tracks", [])
+			
+			if not ytm_tracks:
+				continue
+			
+			ytm_track_ids = [ytm_track.get("videoId") for ytm_track in ytm_tracks if ytm_track.get("videoId") and ytm_track.get("videoType") == "MUSIC_VIDEO_TYPE_ATV"]
+
+			if not ytm_track_ids:
+				continue
+
+			ytm_fresh = [ytm_track_id for ytm_track_id in ytm_track_ids if ytm_track_id not in history_set]
+			if ytm_fresh:
+				ytm_track_id = random.choice(ytm_fresh)
+				track_search = await player.node.get_tracks(f"https://music.youtube.com/watch?v={ytm_track_id}")
+				track = track_search.tracks[0]
+				player.store("autoplay_track", track)
+				return
+
+			ytm_semi_fresh = [ytm_track_id for ytm_track_id in ytm_track_ids if ytm_track_id not in recent_set]
+			if ytm_semi_fresh:
+				ytm_track_id = random.choice(ytm_semi_fresh)
+				track_search = await player.node.get_tracks(f"https://music.youtube.com/watch?v={ytm_track_id}")
+				track = track_search.tracks[0]
+				player.store("autoplay_track", track)
+				return
+		
+
+		# second pass if first pass does not bring any results
+		for seed in seed_candidates:
+			search_query = f"https://music.youtube.com/watch?v={seed}&list=RDAMVM{seed}"
+			search_result: lavalink.LoadResult = await player.node.get_tracks(search_query)
+
+			fresh = [track for track in search_result.tracks if track.identifier not in history_set]
+			
+			if fresh:
+				track = random.choice(fresh)
+				player.store("autoplay_track", track)
+				return
+			
+			semi_fresh = [track for track in search_result.tracks if track.identifier not in recent_set]
+
+			if semi_fresh:
+				track = random.choice(semi_fresh)
+				player.store("autoplay_track", track)
+				return
+		
+		# third pass
 		search_query = f"https://music.youtube.com/watch?v={track_id}&list=RDAMVM{track_id}"
 		search_result: lavalink.LoadResult = await player.node.get_tracks(search_query)
 
-		min_val = 0
-		max_val = len(search_result.tracks) - 1
-
-		identifiers = [history_track.identifier for history_track in player.fetch("history")]
-		
-		idx = random.randint(min_val, max_val)
-		while True:
-			if search_result.tracks[idx].identifier not in identifiers:
-				break
-			idx = random.randint(min_val, max_val)
-		
-		track = search_result.tracks[idx]
-
+		track = random.choice(search_result.tracks)
+			
 		player.store("autoplay_track", track)
 	
 
