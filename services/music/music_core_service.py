@@ -378,6 +378,9 @@ class MusicCoreService:
 	async def nowplaying(ctx: discord.ApplicationContext):
 		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
 
+		if not player.is_playing:
+			return await ctx.respond("No track is currently being played.", ephemeral=True)
+		
 		track = player.current
 
 		embed = discord.Embed(
