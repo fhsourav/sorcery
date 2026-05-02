@@ -355,10 +355,10 @@ class MusicCoreService:
 				return True
 		
 		# third pass
-		search_query = f"https://music.youtube.com/watch?v={track_id}&list=RDAMVM{track_id}"
+		search_query = f"https://music.youtube.com/watch?v={seed_candidates[0]}&list=RDAMVM{seed_candidates[0]}"
 		search_result: lavalink.LoadResult = await player.node.get_tracks(search_query)
 
-		track = random.choice(search_result.tracks)
+		track = random.choice(search_result.tracks[1:])
 			
 		player.store("autoplay_track", track)
 
