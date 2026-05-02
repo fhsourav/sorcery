@@ -162,7 +162,7 @@ class LavaPlayer(discord.Cog):
 		history: list = player.fetch("history")
 		history.insert(0, event.track)
 
-		add_autoplay_track_task: asyncio.Task = asyncio.create_task(MusicCoreService.add_autoplay_track(player, event.track.identifier))
+		add_autoplay_track_task: asyncio.Task = asyncio.create_task(MusicCoreService.add_autoplay_track(player))
 		
 		embed: discord.Embed = discord.Embed(title="Now Playing")
 		embed.description = f"**[{event.track.title}]({event.track.uri})** by `{event.track.author}`"
@@ -212,7 +212,7 @@ class LavaPlayer(discord.Cog):
 		
 		voice_channel = guild.get_channel(event.player.channel_id)
 
-		if voice_channel.status == player.fetch('channel_status'):
+		if voice_channel and voice_channel.status == player.fetch('channel_status'):
 			await voice_channel.set_status(None)
 
 		if player.fetch("autoplay") and not player.queue and not player.is_playing:

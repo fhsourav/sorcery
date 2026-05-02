@@ -274,20 +274,28 @@ class MusicCoreService:
 
 		player.store('autoplay', set)
 
-		await MusicCoreService.add_autoplay_track(player, player.current.identifier)
+		if not await MusicCoreService.add_autoplay_track(player):
+			player.store('autoplay', False)
+			return await ctx.respond(f"No autoplay tracks to add. Play a `YouTube` track first and try again!")
 
-		await ctx.respond(f"Autoplay has been {'enable' if set else 'disabled'}.")
+		await ctx.respond(f"Autoplay has been {'enabled' if set else 'disabled'}.")
 	
 
-	async def add_autoplay_track(player: lavalink.DefaultPlayer, track_id: str):
+	async def add_autoplay_track(player: lavalink.DefaultPlayer):
 		if not player.fetch("autoplay"):
-			return
+			return True
 		
-		history = [history_track.identifier for history_track in player.fetch("history")]
-		history_set = set(history)
-		recent_set = set(history[:30])
+		history: list[lavalink.AudioTrack] = player.fetch("history")
 		
-		seed_candidates = [track_id]
+		history_track_ids: list[str] = [history_track.identifier for history_track in history if history_track.source_name == "youtube"]
+
+		if not history_track_ids:
+			return False
+
+		history_id_set = set(history_track_ids[1:])
+		recent_history_id_set = set(history_track_ids[1:31])
+
+		seed_candidates = [history_track_ids[0]]
 		seed_candidates += random.sample(history[1:], min(3, len(history) - 1))
 
 		track = None
@@ -297,7 +305,7 @@ class MusicCoreService:
 
 		for seed in seed_candidates:
 			try:
-				watch = ytmusic.get_watch_playlist(seed, limit=20, radio=True)
+				watch = ytmusic.get_watch_playlist(seed, limit=10, radio=True)
 			except Exception:
 				watch = None
 			
@@ -309,26 +317,22 @@ class MusicCoreService:
 			if not ytm_tracks:
 				continue
 			
-			ytm_track_ids = [ytm_track.get("videoId") for ytm_track in ytm_tracks if ytm_track.get("videoId") and ytm_track.get("videoType") == "MUSIC_VIDEO_TYPE_ATV"]
+			fresh_ytm_tracks = [ytm_track for ytm_track in ytm_tracks[:10] if ytm_track.get("videoId") and ytm_track.get("videoType") == "MUSIC_VIDEO_TYPE_ATV" and ytm_track.get("videoId") not in history_id_set]
 
-			if not ytm_track_ids:
-				continue
-
-			ytm_fresh = [ytm_track_id for ytm_track_id in ytm_track_ids if ytm_track_id not in history_set]
-			if ytm_fresh:
-				ytm_track_id = random.choice(ytm_fresh)
-				track_search = await player.node.get_tracks(f"https://music.youtube.com/watch?v={ytm_track_id}")
+			if fresh_ytm_tracks:
+				ytm_track = random.choice(fresh_ytm_tracks)
+				track_search = await player.node.get_tracks(f"ytmsearch:{ytm_track.get("title")} {ytm_track.get("artists")[0]["name"]}")
 				track = track_search.tracks[0]
 				player.store("autoplay_track", track)
-				return
+				return True
 
-			ytm_semi_fresh = [ytm_track_id for ytm_track_id in ytm_track_ids if ytm_track_id not in recent_set]
-			if ytm_semi_fresh:
-				ytm_track_id = random.choice(ytm_semi_fresh)
-				track_search = await player.node.get_tracks(f"https://music.youtube.com/watch?v={ytm_track_id}")
+			semi_fresh_ytm_tracks = [ytm_track for ytm_track in ytm_tracks[:10] if ytm_track.get("videoId") and ytm_track.get("videoType") == "MUSIC_VIDEO_TYPE_ATV" and ytm_track.get("videoId") not in recent_history_id_set]
+			if semi_fresh_ytm_tracks:
+				ytm_track = random.choice(semi_fresh_ytm_tracks)
+				track_search = await player.node.get_tracks(f"ytmsearch:{ytm_track.get("title")} {ytm_track.get("artists")[0]["name"]}")
 				track = track_search.tracks[0]
 				player.store("autoplay_track", track)
-				return
+				return True
 		
 
 		# second pass if first pass does not bring any results
@@ -336,19 +340,19 @@ class MusicCoreService:
 			search_query = f"https://music.youtube.com/watch?v={seed}&list=RDAMVM{seed}"
 			search_result: lavalink.LoadResult = await player.node.get_tracks(search_query)
 
-			fresh = [track for track in search_result.tracks if track.identifier not in history_set]
+			fresh = [track for track in search_result.tracks if track.identifier not in history_id_set]
 			
 			if fresh:
 				track = random.choice(fresh)
 				player.store("autoplay_track", track)
-				return
+				return True
 			
-			semi_fresh = [track for track in search_result.tracks if track.identifier not in recent_set]
+			semi_fresh = [track for track in search_result.tracks if track.identifier not in recent_history_id_set]
 
 			if semi_fresh:
 				track = random.choice(semi_fresh)
 				player.store("autoplay_track", track)
-				return
+				return True
 		
 		# third pass
 		search_query = f"https://music.youtube.com/watch?v={track_id}&list=RDAMVM{track_id}"
@@ -357,6 +361,8 @@ class MusicCoreService:
 		track = random.choice(search_result.tracks)
 			
 		player.store("autoplay_track", track)
+
+		return True
 	
 
 	async def add_autoplay_track_to_queue(player: lavalink.DefaultPlayer):
