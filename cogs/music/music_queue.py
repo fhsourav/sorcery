@@ -25,7 +25,7 @@ class MusicQueue(discord.Cog):
 		:param ctx: Description
 		:type ctx: discord.ApplicationContext
 		"""
-		await MusicQueueService.display_queue(ctx)
+		await MusicQueueService.get_queue_paginator(ctx, 0)
 	
 
 	@discord.slash_command(name="history")
@@ -40,7 +40,7 @@ class MusicQueue(discord.Cog):
 		:param ctx: Description
 		:type ctx: discord.ApplicationContext
 		"""
-		await MusicQueueService.display_history(ctx)
+		await MusicQueueService.get_queue_paginator(ctx, 1)
 	
 
 	@discord.slash_command(name="delete")

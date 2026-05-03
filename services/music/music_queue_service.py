@@ -10,28 +10,7 @@ from services.music.music_core_service import MusicCoreService
 
 class MusicQueueService:
 	
-
-	async def display_queue(ctx: discord.ApplicationContext):
-		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
-
-		queue: list[lavalink.AudioTrack] = player.queue
-
-		paginator: pages.Paginator = MusicQueueService.get_queue_paginator(ctx, queue, 0)
-
-		await paginator.respond(ctx.interaction)
-
-	
-	async def display_history(ctx: discord.ApplicationContext):
-		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
-
-		history: list[lavalink.AudioTrack] = player.fetch('history')[1:]
-
-		paginator: pages.Paginator = MusicQueueService.get_queue_paginator(ctx, history, 1)
-
-		await paginator.respond(ctx.interaction)
-
-	
-	def get_queue_paginator(ctx: discord.ApplicationContext, queue: list[lavalink.AudioTrack], category: int):
+	async def get_queue_paginator(ctx: discord.ApplicationContext, category: int):
 		"""
 		Docstring for get_queue_paginator
 
@@ -51,25 +30,30 @@ class MusicQueueService:
 		footer = None
 		thumbnail = None
 		empty_queue_message = ""
+		
+		player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
 
-		if not category == 2: # if not playlist
-			player: lavalink.DefaultPlayer = ctx.bot.lavalink.player_manager.get(ctx.guild.id)
+		footerText = MusicCoreService.get_player_state(player)
+		footer = discord.EmbedFooter(text=footerText)
 
-			footerText = MusicCoreService.get_player_state(player)
-			footer = discord.EmbedFooter(text=footerText)
-
-			if player.is_playing:
-				description += f"### {'⏸️' if player.paused else '▶️'} Now playing\n"
-				description += f"**[{player.current.title}]({player.current.uri})** by `{player.current.author}` [{Utils.milli_to_minutes(player.current.duration - player.position)} *left*]\n"
-				if player.current.artwork_url:
-					thumbnail = player.current.artwork_url
+		if player.is_playing:
+			description += f"### {'⏸️' if player.paused else '▶️'} Now playing\n"
+			description += f"**[{player.current.title}]({player.current.uri})** by `{player.current.author}` [{Utils.milli_to_minutes(player.current.duration - player.position)} *left*]\n"
+			if player.current.artwork_url:
+				thumbnail = player.current.artwork_url
 
 		if category == 0: # current queue
+			queue: list[lavalink.AudioTrack] = player.queue
 			description += "## 📜 Queue"
 			empty_queue_message = "Queue is empty."
 			if player.fetch("autoplay"):
 				empty_queue_message += " Autoplay is enabled."
 		elif category == 1: # history
+			if player.is_playing:
+				history_idx = 1
+			else:
+				history_idx = 0
+			queue: list[lavalink.AudioTrack] = player.fetch('history')[history_idx:]
 			description += "## ⌛ History"
 			empty_queue_message = "Player history is empty."
 		elif category == 2: # playlist
@@ -128,7 +112,7 @@ class MusicQueueService:
 			timeout=30,
 		)
 
-		return paginator
+		await paginator.respond(ctx.interaction)
 	
 
 	async def queue_autocomplete(self, ctx: discord.AutocompleteContext):

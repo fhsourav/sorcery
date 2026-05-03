@@ -292,11 +292,11 @@ class MusicCoreService:
 		if not history_track_ids:
 			return False
 
-		history_id_set = set(history_track_ids[1:])
-		recent_history_id_set = set(history_track_ids[1:31])
+		history_id_set = set(history_track_ids)
+		recent_history_id_set = set(history_track_ids[:30])
 
 		seed_candidates = [history_track_ids[0]]
-		seed_candidates += random.sample(history[1:], min(3, len(history) - 1))
+		seed_candidates += random.sample(history_track_ids[1:], min(3, len(history) - 1))
 
 		track = None
 
